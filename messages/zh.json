@@ -78,6 +78,7 @@
     "firstFrame": "首帧",
     "lastFrame": "尾帧",
     "cameraDirection": "镜头方向",
+    "copyPrompt": "复制提示词",
     "dialogue": "台词",
     "noShots": "还没有分镜，先生成分镜"
   },

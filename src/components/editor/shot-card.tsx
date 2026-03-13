@@ -12,6 +12,7 @@ import { useModelGuard } from "@/hooks/use-model-guard";
 import { VideoRatioPicker } from "@/components/editor/video-ratio-picker";
 import { apiFetch } from "@/lib/api-fetch";
 import { toast } from "sonner";
+import { buildVideoPrompt } from "@/lib/ai/prompts/video-generate";
 import {
   Loader2,
   ChevronDown,
@@ -21,6 +22,8 @@ import {
   MessageCircle,
   Clock,
   Sparkles,
+  Copy,
+  Check,
 } from "lucide-react";
 
 interface Dialogue {
@@ -47,6 +50,7 @@ interface ShotCardProps {
   onUpdate: () => void;
   batchGeneratingFrames?: boolean;
   batchGeneratingVideo?: boolean;
+  characterDescriptions?: string;
 }
 
 const statusVariant: Record<string, "outline" | "success" | "warning" | "destructive"> = {
@@ -74,6 +78,7 @@ export function ShotCard({
   onUpdate,
   batchGeneratingFrames,
   batchGeneratingVideo,
+  characterDescriptions,
 }: ShotCardProps) {
   const t = useTranslations();
   const getModelConfig = useModelStore((s) => s.getModelConfig);
@@ -88,6 +93,7 @@ export function ShotCard({
   const [expanded, setExpanded] = useState(false);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const [videoRatio, setVideoRatio] = useState("16:9");
+  const [copied, setCopied] = useState(false);
   const imageGuard = useModelGuard("image");
   const videoGuard = useModelGuard("video");
   const isGeneratingFrames = generatingFrames || (!!batchGeneratingFrames && !firstFrame && !lastFrame);
@@ -147,6 +153,21 @@ export function ShotCard({
       toast.error(t("common.generationFailed"));
     }
     setGeneratingVideo(false);
+  }
+
+  function handleCopyPrompt(e: React.MouseEvent) {
+    e.stopPropagation();
+    const videoPrompt = motionScript
+      ? buildVideoPrompt({
+          sceneDescription: prompt,
+          motionScript,
+          cameraDirection,
+          characterDescriptions,
+        })
+      : prompt;
+    navigator.clipboard.writeText(videoPrompt);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   return (
@@ -247,6 +268,13 @@ export function ShotCard({
               )}
             </>
           )}
+          <button
+            onClick={handleCopyPrompt}
+            title={t("shot.copyPrompt")}
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-[--text-muted] transition-colors hover:bg-[--surface] hover:text-[--text-primary]"
+          >
+            {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+          </button>
           <Badge variant={variant} className={status === "generating" ? "animate-status-pulse" : ""}>
             {status}
           </Badge>

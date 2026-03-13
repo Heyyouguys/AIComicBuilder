@@ -96,6 +96,10 @@ export default function StoryboardPage() {
 
   if (!project) return null;
 
+  const characterDescriptions = project.characters
+    .map((c) => `${c.name}: ${c.description}`)
+    .join("\n");
+
   const totalShots = project.shots.length;
   const shotsWithFrames = project.shots.filter(
     (s) => s.firstFrame && s.lastFrame
@@ -395,6 +399,7 @@ export default function StoryboardPage() {
               onUpdate={() => fetchProject(project.id)}
               batchGeneratingFrames={generatingFrames}
               batchGeneratingVideo={generatingVideos}
+              characterDescriptions={characterDescriptions}
             />
           ))}
         </div>

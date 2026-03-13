@@ -78,6 +78,7 @@
     "firstFrame": "最初のフレーム",
     "lastFrame": "最後のフレーム",
     "cameraDirection": "カメラ方向",
+    "copyPrompt": "プロンプトをコピー",
     "dialogue": "セリフ",
     "noShots": "まだショットがありません。先に脚本からショットを生成してください。"
   },

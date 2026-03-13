@@ -78,6 +78,7 @@
     "firstFrame": "First Frame",
     "lastFrame": "Last Frame",
     "cameraDirection": "Camera Direction",
+    "copyPrompt": "Copy Prompt",
     "dialogue": "Dialogue",
     "noShots": "No shots yet. Generate shots from the script first."
   },

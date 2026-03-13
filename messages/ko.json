@@ -78,6 +78,7 @@
     "firstFrame": "첫 번째 프레임",
     "lastFrame": "마지막 프레임",
     "cameraDirection": "카메라 방향",
+    "copyPrompt": "프롬프트 복사",
     "dialogue": "대사",
     "noShots": "아직 샷이 없습니다. 먼저 각본에서 샷을 생성하세요."
   },
