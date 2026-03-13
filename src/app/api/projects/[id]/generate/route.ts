@@ -775,41 +775,40 @@ async function handleBatchVideoGenerate(
     )
   );
 
-  // Concurrent generation — each task catches its own errors
-  const results = await Promise.all(
-    eligible.map(async (shot) => {
-      try {
-        const videoPrompt = shot.motionScript
-          ? buildVideoPrompt({
-              sceneDescription: shot.prompt || "",
-              motionScript: shot.motionScript,
-              cameraDirection: shot.cameraDirection || "static",
-              characterDescriptions,
-            })
-          : shot.prompt || "";
+  // Sequential generation — one shot at a time to avoid concurrent polling conflicts
+  const results: Array<{ shotId: string; sequence: number; status: "ok" | "error"; videoUrl?: string; error?: string }> = [];
+  for (const shot of eligible) {
+    try {
+      const videoPrompt = shot.motionScript
+        ? buildVideoPrompt({
+            sceneDescription: shot.prompt || "",
+            motionScript: shot.motionScript,
+            cameraDirection: shot.cameraDirection || "static",
+            characterDescriptions,
+          })
+        : shot.prompt || "";
 
-        const videoPath = await videoProvider.generateVideo({
-          firstFrame: shot.firstFrame!,
-          lastFrame: shot.lastFrame!,
-          prompt: videoPrompt,
-          duration: shot.duration ?? 10,
-          ratio,
-        });
+      const videoPath = await videoProvider.generateVideo({
+        firstFrame: shot.firstFrame!,
+        lastFrame: shot.lastFrame!,
+        prompt: videoPrompt,
+        duration: shot.duration ?? 10,
+        ratio,
+      });
 
-        await db
-          .update(shots)
-          .set({ videoUrl: videoPath, status: "completed" })
-          .where(eq(shots.id, shot.id));
+      await db
+        .update(shots)
+        .set({ videoUrl: videoPath, status: "completed" })
+        .where(eq(shots.id, shot.id));
 
-        console.log(`[BatchVideoGenerate] Shot ${shot.sequence} completed`);
-        return { shotId: shot.id, sequence: shot.sequence, status: "ok" as const, videoUrl: videoPath };
-      } catch (err) {
-        console.error(`[BatchVideoGenerate] Error for shot ${shot.sequence}:`, err);
-        await db.update(shots).set({ status: "failed" }).where(eq(shots.id, shot.id));
-        return { shotId: shot.id, sequence: shot.sequence, status: "error" as const, error: String(err) };
-      }
-    })
-  );
+      console.log(`[BatchVideoGenerate] Shot ${shot.sequence} completed`);
+      results.push({ shotId: shot.id, sequence: shot.sequence, status: "ok", videoUrl: videoPath });
+    } catch (err) {
+      console.error(`[BatchVideoGenerate] Error for shot ${shot.sequence}:`, err);
+      await db.update(shots).set({ status: "failed" }).where(eq(shots.id, shot.id));
+      results.push({ shotId: shot.id, sequence: shot.sequence, status: "error", error: String(err) });
+    }
+  }
 
   return NextResponse.json({ results });
 }
