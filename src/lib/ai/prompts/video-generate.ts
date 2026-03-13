@@ -5,7 +5,17 @@ export function buildVideoPrompt(params: {
   duration?: number;
   characterDescriptions?: string;
 }): string {
-  // motionScript already contains time-segmented narrative — no top-level scene prefix needed.
-  // characterDescriptions omitted: first/last frames already carry visual character reference.
-  return `${params.motionScript}，镜头${params.cameraDirection}。`;
+  // motionScript contains per-segment camera directions — no need to repeat overall cameraDirection.
+  // Reformat segments onto separate lines for readability.
+  const segments = params.motionScript
+    .split(/(?=\d+[-–]\d+s[：:])/i)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (segments.length <= 1) {
+    // Fallback: no segments found, output as-is
+    return params.motionScript.trim();
+  }
+
+  return segments.join("\n");
 }
