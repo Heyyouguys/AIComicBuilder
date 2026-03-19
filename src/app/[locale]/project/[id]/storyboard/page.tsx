@@ -5,7 +5,7 @@ import { useModelStore } from "@/stores/model-store";
 import { ShotCard } from "@/components/editor/shot-card";
 import { Button } from "@/components/ui/button";
 import { useTranslations, useLocale } from "next-intl";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import type { StoryboardVersion } from "@/stores/project-store";
 import { useModelGuard } from "@/hooks/use-model-guard";
 import {
@@ -14,86 +14,18 @@ import {
   ImageIcon,
   VideoIcon,
   Loader2,
-  Check,
-  ChevronRight,
   Download,
   RefreshCw,
+  Play,
+  Plus,
 } from "lucide-react";
 import { InlineModelPicker } from "@/components/editor/model-selector";
 import { VideoRatioPicker } from "@/components/editor/video-ratio-picker";
 import { apiFetch } from "@/lib/api-fetch";
 import { toast } from "sonner";
 import { GenerationModeTab } from "@/components/editor/generation-mode-tab";
+import { ShotDrawer } from "@/components/editor/shot-drawer";
 import Link from "next/link";
-
-type StepStatus = "pending" | "active" | "completed";
-
-function WorkflowStep({
-  step,
-  label,
-  count,
-  status,
-  icon: Icon,
-  isLast,
-  isActive,
-  onClick,
-}: {
-  step: number;
-  label: string;
-  count: string;
-  status: StepStatus;
-  icon: React.ElementType;
-  isLast: boolean;
-  isActive?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <button
-        onClick={onClick}
-        className={`flex items-center gap-2.5 rounded-lg px-2 py-1 transition-all hover:bg-[--surface] ${
-          isActive ? "ring-2 ring-primary/40 bg-primary/5 rounded-lg" : ""
-        }`}
-      >
-        {/* Step circle */}
-        <div
-          className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-colors ${
-            status === "completed"
-              ? "bg-emerald-500/15 text-emerald-600"
-              : status === "active"
-                ? "bg-primary/15 text-primary ring-2 ring-primary/30"
-                : "bg-[--surface] text-[--text-muted]"
-          }`}
-        >
-          {status === "completed" ? (
-            <Check className="h-3.5 w-3.5" />
-          ) : (
-            <Icon className="h-3.5 w-3.5" />
-          )}
-        </div>
-        {/* Label + count */}
-        <div className="min-w-0 text-left">
-          <p
-            className={`text-sm font-medium leading-tight ${
-              status === "active"
-                ? "text-[--text-primary]"
-                : status === "completed"
-                  ? "text-emerald-600"
-                  : "text-[--text-muted]"
-            }`}
-          >
-            {label}
-          </p>
-          <p className="text-[10px] text-[--text-muted]">{count}</p>
-        </div>
-      </button>
-      {/* Connector */}
-      {!isLast && (
-        <ChevronRight className="mx-1 h-4 w-4 flex-shrink-0 text-[--text-muted]/40" />
-      )}
-    </div>
-  );
-}
 
 export default function StoryboardPage() {
   const t = useTranslations();
@@ -111,8 +43,7 @@ export default function StoryboardPage() {
   const [videoRatio, setVideoRatio] = useState("16:9");
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [versions, setVersions] = useState<StoryboardVersion[]>([]);
-  const [activeStep, setActiveStep] = useState<1 | 2 | 3 | 4>(1);
-  const manualStepRef = useRef(false);
+  const [openDrawerShotId, setOpenDrawerShotId] = useState<string | null>(null);
   const textGuard = useModelGuard("text");
   const imageGuard = useModelGuard("image");
   const videoGuard = useModelGuard("video");
@@ -128,32 +59,13 @@ export default function StoryboardPage() {
     });
   }, [project?.versions]);
 
-  useEffect(() => {
-    if (!project || manualStepRef.current) return;
-    const shots = project.shots;
-    const totalCount = shots.length;
-    const frameAnyCount = shots.filter(
-      (s) => s.sceneRefFrame || s.firstFrame || s.lastFrame
-    ).length;
-    const videoPromptsCount = shots.filter((s) => s.videoPrompt).length;
-    if (totalCount === 0) setActiveStep(1);
-    else if (frameAnyCount === 0) setActiveStep(2);
-    else if (videoPromptsCount === 0) setActiveStep(3);
-    else setActiveStep(4);
-  }, [project]);
-
   if (!project) return null;
-
-  const characterDescriptions = project.characters
-    .map((c) => `${c.name}: ${c.description}`)
-    .join("\n");
 
   const totalShots = project.shots.length;
   const shotsWithFrames = project.shots.filter(
     (s) => s.firstFrame && s.lastFrame
   ).length;
   const generationMode = (project.generationMode || "keyframe") as "keyframe" | "reference";
-
   const shotsWithVideo = project.shots.filter((s) =>
     generationMode === "reference" ? s.referenceVideoUrl : s.videoUrl
   ).length;
@@ -165,43 +77,25 @@ export default function StoryboardPage() {
   const charactersWithRefs = project.characters.filter((c) => c.referenceImage);
   const hasReferenceImages = charactersWithRefs.length > 0;
 
-  // Determine step statuses
-  const step1Status: StepStatus =
-    totalShots > 0 ? "completed" : "active";
-  const step2Status: StepStatus =
-    totalShots === 0
-      ? "pending"
-      : generationMode === "reference"
-        ? shotsWithSceneFrames === totalShots
-          ? "completed"
-          : "active"
-        : shotsWithFrames === totalShots
-          ? "completed"
-          : "active";
-  const stepPromptStatus: StepStatus =
-    totalShots === 0 || shotsWithFrameAny === 0
-      ? "pending"
-      : shotsWithVideoPrompts === totalShots
-        ? "completed"
-        : "active";
-  const step3Status: StepStatus =
-    totalShots === 0
-      ? "pending"
-      : generationMode === "reference"
-        ? shotsWithVideo === totalShots
-          ? "completed"
-          : totalShots > 0
-            ? "active"
-            : "pending"
-        : shotsWithFrames === 0
-          ? "pending"
-          : shotsWithVideo === totalShots
-            ? "completed"
-            : shotsWithFrames > 0
-              ? "active"
-              : "pending";
-
   const anyGenerating = generating || generatingFrames || generatingVideos || generatingSceneFrames || generatingVideoPrompts;
+
+  const drawerShots = project.shots.map((shot) => ({
+    id: shot.id,
+    sequence: shot.sequence,
+    prompt: shot.prompt,
+    startFrameDesc: shot.startFrameDesc,
+    endFrameDesc: shot.endFrameDesc,
+    videoScript: shot.videoScript,
+    motionScript: shot.motionScript,
+    cameraDirection: shot.cameraDirection,
+    duration: shot.duration,
+    firstFrame: shot.firstFrame,
+    lastFrame: shot.lastFrame,
+    sceneRefFrame: shot.sceneRefFrame,
+    videoPrompt: shot.videoPrompt,
+    videoUrl: generationMode === "reference" ? shot.referenceVideoUrl : shot.videoUrl,
+    dialogues: shot.dialogues || [],
+  }));
 
   async function handleGenerateShots() {
     if (!project) return;
@@ -382,8 +276,34 @@ export default function StoryboardPage() {
     fetchProject(project.id);
   }
 
+  async function handleAutoRun() {
+    if (!project) return;
+    if (!confirm(t("project.autoRunConfirm"))) return;
+
+    const shots = project.shots;
+    const needsText = shots.some((s) => !s.prompt && !s.motionScript);
+    const needsFrame = shots.some((s) =>
+      generationMode === "reference" ? !s.sceneRefFrame : !s.firstFrame || !s.lastFrame
+    );
+    const needsPrompt = shots.some((s) => !s.videoPrompt);
+    const needsVideo = shots.some((s) =>
+      generationMode === "reference" ? !s.referenceVideoUrl : !s.videoUrl
+    );
+
+    if (needsText) await handleGenerateShots();
+    if (needsFrame) {
+      if (generationMode === "reference") await handleBatchGenerateSceneFrames(false);
+      else await handleBatchGenerateFrames(false);
+    }
+    if (needsPrompt) await handleBatchGenerateVideoPrompts();
+    if (needsVideo) {
+      if (generationMode === "reference") await handleBatchGenerateReferenceVideos(false);
+      else await handleBatchGenerateVideos(false);
+    }
+  }
+
   return (
-    <div className="animate-page-in space-y-6">
+    <div className="animate-page-in space-y-4">
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -399,31 +319,74 @@ export default function StoryboardPage() {
             </p>
           </div>
         </div>
-        {totalShots > 0 && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const a = document.createElement("a");
-              a.href = `/api/projects/${project!.id}/download`;
-              a.download = "";
-              a.click();
-            }}
-          >
-            <Download className="h-3.5 w-3.5" />
-            {t("project.downloadAll")}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {totalShots > 0 && (
+            <Link
+              href={`/${locale}/project/${project!.id}/preview${selectedVersionId ? `?versionId=${selectedVersionId}` : ""}`}
+              className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium shadow-xs hover:bg-accent hover:text-accent-foreground"
+            >
+              <Film className="h-3.5 w-3.5" />
+              {t("project.preview")}
+            </Link>
+          )}
+          {totalShots > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const a = document.createElement("a");
+                a.href = `/api/projects/${project!.id}/download`;
+                a.download = "";
+                a.click();
+              }}
+            >
+              <Download className="h-3.5 w-3.5" />
+              {t("project.downloadAll")}
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* ── 3-Step Workflow Pipeline ── */}
-      <div className="rounded-2xl border border-[--border-subtle] bg-white p-4">
-        {/* Generation mode tab */}
-        <GenerationModeTab />
+      {/* ── Control Panel ── */}
+      <div className="rounded-2xl border border-[--border-subtle] bg-white p-4 space-y-3">
+        {/* Generation mode + version tabs row */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <GenerationModeTab />
+
+          {/* Version tabs */}
+          {versions.length > 0 && (
+            <div className="flex items-center gap-1">
+              {versions.map((v) => (
+                <button
+                  key={v.id}
+                  onClick={() => {
+                    setSelectedVersionId(v.id);
+                    fetchProject(project!.id, v.id);
+                  }}
+                  className={`rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors ${
+                    selectedVersionId === v.id
+                      ? "bg-primary/10 text-primary"
+                      : "text-[--text-muted] hover:bg-[--surface] hover:text-[--text-secondary]"
+                  }`}
+                >
+                  {v.label}
+                </button>
+              ))}
+              <button
+                onClick={handleGenerateShots}
+                disabled={anyGenerating}
+                className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] text-[--text-muted] transition-colors hover:bg-[--surface] hover:text-[--text-secondary] disabled:opacity-40"
+                title={t("project.generateShots")}
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Reference image mode: character indicator */}
         {generationMode === "reference" && (
-          <div className={`mt-3 rounded-lg px-3 py-2 text-sm ${
+          <div className={`rounded-lg px-3 py-2 text-sm ${
             hasReferenceImages
               ? "bg-violet-50 text-violet-700 border border-violet-200"
               : "bg-amber-50 text-amber-700 border border-amber-200"
@@ -447,281 +410,180 @@ export default function StoryboardPage() {
           </div>
         )}
 
-        {/* Step indicators */}
-        <div className="mt-4 flex items-center gap-1">
-          <WorkflowStep
-            step={1}
-            label={t("project.workflowStepShots")}
-            count={
-              totalShots > 0
-                ? t("project.workflowShotsCount", {
-                    completed: totalShots,
-                    total: totalShots,
-                  })
-                : "—"
-            }
-            status={step1Status}
-            icon={Sparkles}
-            isLast={false}
-            isActive={activeStep === 1}
-            onClick={() => { manualStepRef.current = true; setActiveStep(1); }}
-          />
-          {generationMode === "keyframe" ? (
-            <WorkflowStep
-              step={2}
-              label={t("project.workflowStepFrames")}
-              count={
-                totalShots > 0
-                  ? t("project.workflowFramesCount", {
-                      completed: shotsWithFrames,
-                      total: totalShots,
-                    })
-                  : "—"
-              }
-              status={step2Status}
-              icon={ImageIcon}
-              isLast={false}
-              isActive={activeStep === 2}
-              onClick={() => { manualStepRef.current = true; setActiveStep(2); }}
-            />
-          ) : (
-            <WorkflowStep
-              step={2}
-              label={t("project.workflowStepSceneFrames")}
-              count={
-                totalShots > 0
-                  ? t("project.workflowSceneFramesCount", {
-                      completed: shotsWithSceneFrames,
-                      total: totalShots,
-                    })
-                  : "—"
-              }
-              status={step2Status}
-              icon={ImageIcon}
-              isLast={false}
-              isActive={activeStep === 2}
-              onClick={() => { manualStepRef.current = true; setActiveStep(2); }}
-            />
-          )}
-          <WorkflowStep
-            step={3}
-            label={t("project.workflowStepVideoPrompts")}
-            count={
-              totalShots > 0
-                ? t("project.workflowVideoPromptsCount", {
-                    completed: shotsWithVideoPrompts,
-                    total: totalShots,
-                  })
-                : "—"
-            }
-            status={stepPromptStatus}
-            icon={Sparkles}
-            isLast={false}
-            isActive={activeStep === 3}
-            onClick={() => { manualStepRef.current = true; setActiveStep(3); }}
-          />
-          <WorkflowStep
-            step={4}
-            label={t("project.workflowStepVideos")}
-            count={
-              totalShots > 0
-                ? t("project.workflowVideosCount", {
-                    completed: shotsWithVideo,
-                    total: totalShots,
-                  })
-                : "—"
-            }
-            status={step3Status}
-            icon={VideoIcon}
-            isLast
-            isActive={activeStep === 4}
-            onClick={() => { manualStepRef.current = true; setActiveStep(4); }}
-          />
-        </div>
+        {/* Batch operations */}
+        <div className="space-y-2">
+          {/* Row 1: Generate text / shots */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="w-4 h-4 flex-shrink-0 flex items-center justify-center rounded-full bg-[--surface] text-[10px] font-bold text-[--text-muted]">1</span>
+            <InlineModelPicker capability="text" />
+            <Button
+              onClick={handleGenerateShots}
+              disabled={anyGenerating}
+              variant={totalShots > 0 ? "outline" : "default"}
+              size="sm"
+            >
+              {generating ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="h-3.5 w-3.5" />
+              )}
+              {generating ? t("common.generating") : t("project.generateShots")}
+            </Button>
+          </div>
 
-        {/* Step action panel */}
-        <div className="mt-3 flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
-          {/* Step 1: Generate shots */}
-          {activeStep === 1 && (
-            <>
-              <InlineModelPicker capability="text" />
-              <Button
-                onClick={handleGenerateShots}
-                disabled={anyGenerating}
-                variant={step1Status === "completed" ? "outline" : "default"}
-                size="sm"
-              >
-                {generating ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="h-3.5 w-3.5" />
-                )}
-                {generating ? t("common.generating") : t("project.generateShots")}
-              </Button>
-              {versions.length > 0 && (
-                <select
-                  value={selectedVersionId ?? ""}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setSelectedVersionId(v);
-                    fetchProject(project!.id, v);
-                  }}
-                  className="h-8 w-36 rounded-lg border border-[--border-subtle] bg-transparent px-2 text-[13px] text-[--text-secondary] outline-none cursor-pointer hover:border-[--border-hover]"
+          {/* Row 2: Frames */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="w-4 h-4 flex-shrink-0 flex items-center justify-center rounded-full bg-[--surface] text-[10px] font-bold text-[--text-muted]">2</span>
+            <InlineModelPicker capability="image" />
+            {generationMode === "keyframe" ? (
+              <>
+                <Button
+                  onClick={() => handleBatchGenerateFrames(false)}
+                  disabled={anyGenerating || totalShots === 0}
+                  variant={shotsWithFrames === totalShots && totalShots > 0 ? "outline" : "default"}
+                  size="sm"
                 >
-                  {versions.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.label}
-                    </option>
-                  ))}
-                </select>
+                  {generatingFrames && !generatingFramesOverwrite ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <ImageIcon className="h-3.5 w-3.5" />
+                  )}
+                  {generatingFrames && !generatingFramesOverwrite
+                    ? t("common.generating")
+                    : t("project.batchGenerateFrames")}
+                </Button>
+                <Button
+                  onClick={() => handleBatchGenerateFrames(true)}
+                  disabled={anyGenerating || totalShots === 0}
+                  variant="ghost"
+                  size="icon"
+                  title={t("project.batchGenerateFramesOverwrite")}
+                >
+                  {generatingFrames && generatingFramesOverwrite ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  onClick={() => handleBatchGenerateSceneFrames(false)}
+                  disabled={anyGenerating || totalShots === 0 || !hasReferenceImages}
+                  variant={shotsWithSceneFrames === totalShots && totalShots > 0 ? "outline" : "default"}
+                  size="sm"
+                >
+                  {generatingSceneFrames && !sceneFramesOverwrite ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <ImageIcon className="h-3.5 w-3.5" />
+                  )}
+                  {generatingSceneFrames && !sceneFramesOverwrite
+                    ? t("common.generating")
+                    : t("project.batchGenerateSceneFrames")}
+                </Button>
+                <Button
+                  onClick={() => handleBatchGenerateSceneFrames(true)}
+                  disabled={anyGenerating || totalShots === 0 || !hasReferenceImages}
+                  variant="ghost"
+                  size="icon"
+                  title={t("project.batchGenerateSceneFramesOverwrite")}
+                >
+                  {generatingSceneFrames && sceneFramesOverwrite ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </>
+            )}
+          </div>
+
+          {/* Row 3: Video prompts */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="w-4 h-4 flex-shrink-0 flex items-center justify-center rounded-full bg-[--surface] text-[10px] font-bold text-[--text-muted]">3</span>
+            <InlineModelPicker capability="text" />
+            <Button
+              onClick={handleBatchGenerateVideoPrompts}
+              disabled={anyGenerating || shotsWithFrameAny === 0}
+              variant={shotsWithVideoPrompts === totalShots && totalShots > 0 ? "outline" : "default"}
+              size="sm"
+            >
+              {generatingVideoPrompts ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="h-3.5 w-3.5" />
               )}
-            </>
-          )}
+              {generatingVideoPrompts ? t("common.generating") : t("project.batchGenerateVideoPrompts")}
+            </Button>
+          </div>
 
-          {/* Step 2: Frames */}
-          {activeStep === 2 && generationMode === "keyframe" && (
-            <>
-              <InlineModelPicker capability="image" />
-              <Button
-                onClick={() => handleBatchGenerateFrames(false)}
-                disabled={anyGenerating || totalShots === 0}
-                variant={step2Status === "completed" ? "outline" : "default"}
-                size="sm"
-              >
-                {generatingFrames && !generatingFramesOverwrite ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <ImageIcon className="h-3.5 w-3.5" />
-                )}
-                {generatingFrames && !generatingFramesOverwrite
-                  ? t("common.generating")
-                  : t("project.batchGenerateFrames")}
-              </Button>
-              <Button
-                onClick={() => handleBatchGenerateFrames(true)}
-                disabled={anyGenerating || totalShots === 0}
-                variant="ghost"
-                size="icon"
-                title={t("project.batchGenerateFramesOverwrite")}
-              >
-                {generatingFrames && generatingFramesOverwrite ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-3.5 w-3.5" />
-                )}
-              </Button>
-            </>
-          )}
-
-          {activeStep === 2 && generationMode === "reference" && (
-            <>
-              <InlineModelPicker capability="image" />
-              <Button
-                onClick={() => handleBatchGenerateSceneFrames(false)}
-                disabled={anyGenerating || totalShots === 0 || !hasReferenceImages}
-                variant={step2Status === "completed" ? "outline" : "default"}
-                size="sm"
-              >
-                {generatingSceneFrames && !sceneFramesOverwrite ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <ImageIcon className="h-3.5 w-3.5" />
-                )}
-                {generatingSceneFrames && !sceneFramesOverwrite
-                  ? t("common.generating")
-                  : t("project.batchGenerateSceneFrames")}
-              </Button>
-              <Button
-                onClick={() => handleBatchGenerateSceneFrames(true)}
-                disabled={anyGenerating || totalShots === 0 || !hasReferenceImages}
-                variant="ghost"
-                size="icon"
-                title={t("project.batchGenerateSceneFramesOverwrite")}
-              >
-                {generatingSceneFrames && sceneFramesOverwrite ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-3.5 w-3.5" />
-                )}
-              </Button>
-            </>
-          )}
-
-          {/* Step 3: Video prompts */}
-          {activeStep === 3 && (
-            <>
-              <InlineModelPicker capability="text" />
-              <Button
-                onClick={handleBatchGenerateVideoPrompts}
-                disabled={anyGenerating || shotsWithFrameAny === 0}
-                variant={stepPromptStatus === "completed" ? "outline" : "default"}
-                size="sm"
-              >
-                {generatingVideoPrompts ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="h-3.5 w-3.5" />
-                )}
-                {generatingVideoPrompts ? t("common.generating") : t("project.batchGenerateVideoPrompts")}
-              </Button>
-            </>
-          )}
-
-          {/* Step 4: Videos + Preview */}
-          {activeStep === 4 && (
-            <>
-              <InlineModelPicker capability="video" />
-              <VideoRatioPicker value={videoRatio} onChange={setVideoRatio} />
-              <Button
-                onClick={() =>
-                  generationMode === "reference"
-                    ? handleBatchGenerateReferenceVideos(false)
-                    : handleBatchGenerateVideos(false)
-                }
-                disabled={anyGenerating || totalShots === 0 || (generationMode === "reference" ? !hasReferenceImages : shotsWithFrames === 0)}
-                variant={step3Status === "completed" ? "outline" : "default"}
-                size="sm"
-              >
-                {generatingVideos && !generatingVideosOverwrite ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <VideoIcon className="h-3.5 w-3.5" />
-                )}
-                {generatingVideos && !generatingVideosOverwrite
-                  ? t("common.generating")
-                  : generationMode === "reference"
-                    ? t("project.batchGenerateReferenceVideos")
-                    : t("project.batchGenerateVideos")}
-              </Button>
-              <Button
-                onClick={() =>
-                  generationMode === "reference"
-                    ? handleBatchGenerateReferenceVideos(true)
-                    : handleBatchGenerateVideos(true)
-                }
-                disabled={anyGenerating || totalShots === 0 || (generationMode === "reference" ? !hasReferenceImages : shotsWithFrames === 0)}
-                variant="ghost"
-                size="icon"
-                title={t("project.batchGenerateVideosOverwrite")}
-              >
-                {generatingVideos && generatingVideosOverwrite ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-3.5 w-3.5" />
-                )}
-              </Button>
-              {totalShots > 0 && (
-                <>
-                  <div className="mx-1 h-5 w-px bg-[--border-subtle]" />
-                  <Link
-                    href={`/${locale}/project/${project!.id}/preview${selectedVersionId ? `?versionId=${selectedVersionId}` : ""}`}
-                    className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium shadow-xs hover:bg-accent hover:text-accent-foreground"
-                  >
-                    <Film className="h-3.5 w-3.5" />
-                    {t("project.preview")}
-                  </Link>
-                </>
+          {/* Row 4: Videos */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="w-4 h-4 flex-shrink-0 flex items-center justify-center rounded-full bg-[--surface] text-[10px] font-bold text-[--text-muted]">4</span>
+            <InlineModelPicker capability="video" />
+            <VideoRatioPicker value={videoRatio} onChange={setVideoRatio} />
+            <Button
+              onClick={() =>
+                generationMode === "reference"
+                  ? handleBatchGenerateReferenceVideos(false)
+                  : handleBatchGenerateVideos(false)
+              }
+              disabled={anyGenerating || totalShots === 0 || (generationMode === "reference" ? !hasReferenceImages : shotsWithFrames === 0)}
+              variant={shotsWithVideo === totalShots && totalShots > 0 ? "outline" : "default"}
+              size="sm"
+            >
+              {generatingVideos && !generatingVideosOverwrite ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <VideoIcon className="h-3.5 w-3.5" />
               )}
+              {generatingVideos && !generatingVideosOverwrite
+                ? t("common.generating")
+                : generationMode === "reference"
+                  ? t("project.batchGenerateReferenceVideos")
+                  : t("project.batchGenerateVideos")}
+            </Button>
+            <Button
+              onClick={() =>
+                generationMode === "reference"
+                  ? handleBatchGenerateReferenceVideos(true)
+                  : handleBatchGenerateVideos(true)
+              }
+              disabled={anyGenerating || totalShots === 0 || (generationMode === "reference" ? !hasReferenceImages : shotsWithFrames === 0)}
+              variant="ghost"
+              size="icon"
+              title={t("project.batchGenerateVideosOverwrite")}
+            >
+              {generatingVideos && generatingVideosOverwrite ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          </div>
+
+          {/* Divider + Auto-run */}
+          {totalShots > 0 && (
+            <>
+              <div className="h-px bg-[--border-subtle]" />
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={handleAutoRun}
+                  disabled={anyGenerating}
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                >
+                  {anyGenerating ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Play className="h-3.5 w-3.5" />
+                  )}
+                  {t("project.autoRun")}
+                </Button>
+              </div>
             </>
           )}
         </div>
@@ -771,18 +633,28 @@ export default function StoryboardPage() {
               }
               dialogues={shot.dialogues || []}
               onUpdate={() => fetchProject(project.id)}
-              activeStep={activeStep}
-              batchGeneratingFrames={generatingFrames}
-              batchGeneratingVideo={generatingVideos}
-              batchGeneratingVideoPrompts={generatingVideoPrompts}
-              characterDescriptions={characterDescriptions}
               generationMode={generationMode}
-              batchGeneratingReferenceVideo={generationMode === "reference" ? generatingVideos : undefined}
-              batchGeneratingSceneFrames={generationMode === "reference" ? generatingSceneFrames : undefined}
-              batchSceneFramesOverwrite={generationMode === "reference" ? sceneFramesOverwrite : undefined}
+              videoRatio={videoRatio}
+              isCompact={openDrawerShotId !== null}
+              onOpenDrawer={(id) => setOpenDrawerShotId(id)}
             />
           ))}
         </div>
+      )}
+
+      {openDrawerShotId && (
+        <ShotDrawer
+          shots={drawerShots}
+          openShotId={openDrawerShotId}
+          onClose={() => setOpenDrawerShotId(null)}
+          onShotChange={(id) => setOpenDrawerShotId(id)}
+          onUpdate={() => fetchProject(project.id)}
+          projectId={project.id}
+          generationMode={generationMode}
+          videoRatio={videoRatio}
+          selectedVersionId={selectedVersionId}
+          anyGenerating={anyGenerating}
+        />
       )}
     </div>
   );
