@@ -341,27 +341,27 @@ export default function StoryboardPage() {
         </div>
         <div className="flex items-center gap-2">
           {totalShots > 0 && (
-            <div className="inline-flex gap-0.5 rounded-lg border border-[--border-subtle] bg-[--surface] p-0.5">
+            <div className="inline-flex gap-1 rounded-xl border border-[--border-subtle] bg-[--surface] p-1">
               <button
                 onClick={() => switchView("list")}
-                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-all duration-150 ${
                   viewMode === "list"
-                    ? "bg-white text-[--text-primary] shadow-xs"
-                    : "text-[--text-muted] hover:text-[--text-secondary]"
+                    ? "bg-white text-primary shadow ring-1 ring-primary/20"
+                    : "text-[--text-muted] hover:bg-white/60 hover:text-[--text-secondary]"
                 }`}
               >
-                <List className="h-3.5 w-3.5" />
+                <List className={`h-3.5 w-3.5 ${viewMode === "list" ? "text-primary" : ""}`} />
                 {t("project.viewList")}
               </button>
               <button
                 onClick={() => switchView("kanban")}
-                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-all duration-150 ${
                   viewMode === "kanban"
-                    ? "bg-white text-[--text-primary] shadow-xs"
-                    : "text-[--text-muted] hover:text-[--text-secondary]"
+                    ? "bg-white text-primary shadow ring-1 ring-primary/20"
+                    : "text-[--text-muted] hover:bg-white/60 hover:text-[--text-secondary]"
                 }`}
               >
-                <LayoutGrid className="h-3.5 w-3.5" />
+                <LayoutGrid className={`h-3.5 w-3.5 ${viewMode === "kanban" ? "text-primary" : ""}`} />
                 {t("project.viewKanban")}
               </button>
             </div>

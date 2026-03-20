@@ -152,14 +152,14 @@ export default function PreviewPage() {
 
       {/* Mode switcher — only shown when both modes have videos */}
       {hasBothModes && (
-        <div className="flex items-center gap-1 rounded-xl bg-[--surface] p-1 w-fit">
+        <div className="flex items-center gap-1 rounded-xl border border-[--border-subtle] bg-[--surface] p-1 w-fit">
           <button
             onClick={() => handleModeSwitch("keyframe")}
             className={cn(
-              "rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
+              "rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-150",
               previewMode === "keyframe"
-                ? "bg-white text-[--text-primary] shadow-sm"
-                : "text-[--text-muted] hover:text-[--text-secondary]"
+                ? "bg-white text-primary shadow ring-1 ring-primary/20"
+                : "text-[--text-muted] hover:bg-white/60 hover:text-[--text-secondary]"
             )}
           >
             {t("project.generationModeKeyframe")}
@@ -167,10 +167,10 @@ export default function PreviewPage() {
           <button
             onClick={() => handleModeSwitch("reference")}
             className={cn(
-              "rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
+              "rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-150",
               previewMode === "reference"
-                ? "bg-white text-[--text-primary] shadow-sm"
-                : "text-[--text-muted] hover:text-[--text-secondary]"
+                ? "bg-white text-primary shadow ring-1 ring-primary/20"
+                : "text-[--text-muted] hover:bg-white/60 hover:text-[--text-secondary]"
             )}
           >
             {t("project.generationModeReference")}
