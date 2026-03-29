@@ -13,7 +13,14 @@ import { Save, RotateCcw, Layers } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { PresetDialog } from "./preset-dialog";
 
-const CATEGORIES = ["all", "script", "character", "shot", "frame", "video"] as const;
+const CATEGORIES = ["all", "script", "character", "storyboard"] as const;
+
+// Map the UI category to actual registry categories
+const CATEGORY_MAP: Record<string, string[]> = {
+  script: ["script"],
+  character: ["character"],
+  storyboard: ["shot", "frame", "video"],
+};
 
 /** Strip "promptTemplates." prefix from registry nameKeys since t() is already scoped */
 function tKey(nameKey: string): string {
@@ -53,6 +60,7 @@ export function PromptEditor({ scope = "global", projectId, initialPromptKey }: 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [presetDialogOpen, setPresetDialogOpen] = useState(false);
+  const [projectPromptsEnabled, setProjectPromptsEnabled] = useState(false);
 
   const isProject = scope === "project" && !!projectId;
 
@@ -65,14 +73,22 @@ export function PromptEditor({ scope = "global", projectId, initialPromptKey }: 
   useEffect(() => {
     const init = async () => {
       try {
-        const [regResp, overResp] = await Promise.all([
+        const fetches: Promise<Response>[] = [
           apiFetch("/api/prompt-templates/registry"),
           apiFetch(templatesBasePath),
-        ]);
+        ];
+        if (isProject) {
+          fetches.push(apiFetch(`/api/projects/${projectId}`));
+        }
+        const [regResp, overResp, projResp] = await Promise.all(fetches);
         const regData = await regResp.json();
         const overData = await overResp.json();
         setRegistry(regData);
         setServerOverrides(overData);
+        if (projResp) {
+          const projData = await projResp.json();
+          setProjectPromptsEnabled(!!projData.useProjectPrompts);
+        }
 
         // Auto-select prompt
         const autoKey = initialPromptKey || (regData.length > 0 ? regData[0].key : null);
@@ -93,7 +109,7 @@ export function PromptEditor({ scope = "global", projectId, initialPromptKey }: 
   const filteredPrompts =
     categoryFilter === "all"
       ? registry
-      : registry.filter((r) => r.category === categoryFilter);
+      : registry.filter((r) => (CATEGORY_MAP[categoryFilter] ?? [categoryFilter]).includes(r.category));
 
   // Group by category
   const grouped = filteredPrompts.reduce<Record<string, typeof registry>>(
@@ -123,6 +139,15 @@ export function PromptEditor({ scope = "global", projectId, initialPromptKey }: 
       const slots: Record<string, string> = {};
       for (const sk of dirtySlots) {
         slots[sk] = getSlotContent(selectedPromptKey, sk);
+      }
+      // Auto-enable project prompts on save
+      if (isProject && !projectPromptsEnabled) {
+        await apiFetch(`/api/projects/${projectId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ useProjectPrompts: 1 }),
+        });
+        setProjectPromptsEnabled(true);
       }
       await apiFetch(`${templatesBasePath}/${selectedPromptKey}`, {
         method: "PUT",
@@ -168,11 +193,33 @@ export function PromptEditor({ scope = "global", projectId, initialPromptKey }: 
 
   return (
     <div className="flex h-full flex-col gap-4">
-      {/* Scope indicator for project mode */}
+      {/* Project prompts toggle */}
       {isProject && (
-        <div className="flex items-center gap-2 rounded-xl bg-primary/5 px-3 py-2 text-xs text-primary">
-          <Badge variant="default" className="text-[10px]">{t("project.useProjectPrompts")}</Badge>
-          <span className="text-[--text-secondary]">{t("project.useProjectPromptsDesc")}</span>
+        <div className="flex items-center gap-3 rounded-xl bg-primary/5 px-4 py-2.5">
+          <label className="flex cursor-pointer items-center gap-3">
+            <div
+              role="switch"
+              aria-checked={projectPromptsEnabled}
+              onClick={async () => {
+                const next = !projectPromptsEnabled;
+                setProjectPromptsEnabled(next);
+                await apiFetch(`/api/projects/${projectId}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ useProjectPrompts: next ? 1 : 0 }),
+                });
+              }}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ${
+                projectPromptsEnabled ? "bg-primary" : "bg-[--border-subtle]"
+              }`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                projectPromptsEnabled ? "translate-x-4" : "translate-x-0.5"
+              }`} />
+            </div>
+            <span className="text-xs font-medium text-primary">{t("project.useProjectPrompts")}</span>
+          </label>
+          <span className="text-xs text-[--text-secondary]">{t("project.useProjectPromptsDesc")}</span>
         </div>
       )}
 
@@ -184,7 +231,7 @@ export function PromptEditor({ scope = "global", projectId, initialPromptKey }: 
             onClick={() => setCategoryFilter(cat)}
             className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 ${
               categoryFilter === cat
-                ? "bg-white text-[--text-primary] shadow-sm"
+                ? "bg-primary text-white shadow-sm"
                 : "text-[--text-secondary] hover:bg-[--surface] hover:text-[--text-primary]"
             }`}
           >
@@ -272,6 +319,11 @@ export function PromptEditor({ scope = "global", projectId, initialPromptKey }: 
                       ? (t(tKey(selectedSlot.nameKey) as Parameters<typeof t>[0]) || selectedSlot.key)
                       : t("editor.advancedMode")}
                   </span>
+                  {mode === "slots" && selectedSlot && !selectedSlot.editable && (
+                    <Badge className="text-[10px] px-1.5 py-0 bg-[--surface] text-[--text-muted]">
+                      {t("editor.locked")}
+                    </Badge>
+                  )}
                   {selectedPromptKey && isDirty(selectedPromptKey) && (
                     <Badge variant="warning" className="text-[10px] px-1.5 py-0">
                       {t("editor.modified")}
@@ -350,8 +402,9 @@ export function PromptEditor({ scope = "global", projectId, initialPromptKey }: 
                   <div className="flex-1 overflow-y-auto p-3">
                     <textarea
                       value={currentContent}
+                      readOnly={!selectedSlot.editable}
                       onChange={(e) => {
-                        if (selectedPromptKey && selectedSlotKey) {
+                        if (selectedPromptKey && selectedSlotKey && selectedSlot.editable) {
                           setSlotContent(
                             selectedPromptKey,
                             selectedSlotKey,
@@ -359,7 +412,11 @@ export function PromptEditor({ scope = "global", projectId, initialPromptKey }: 
                           );
                         }
                       }}
-                      className="h-full w-full resize-none rounded-xl border border-[--border-subtle] bg-white px-3.5 py-3 font-mono text-[12px] leading-relaxed text-[--text-primary] outline-none transition-all duration-200 placeholder:text-[--text-muted] hover:border-[--border-hover] focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/15"
+                      className={`h-full w-full resize-none rounded-xl border border-[--border-subtle] px-3.5 py-3 font-mono text-[12px] leading-relaxed text-[--text-primary] outline-none transition-all duration-200 placeholder:text-[--text-muted] ${
+                        selectedSlot.editable
+                          ? "bg-white hover:border-[--border-hover] focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/15"
+                          : "bg-[--surface] cursor-default"
+                      }`}
                       placeholder={t("editor.edit")}
                     />
                   </div>

@@ -244,6 +244,7 @@
       "all": "All",
       "script": "Script",
       "character": "Character",
+      "storyboard": "Storyboard",
       "shot": "Storyboard",
       "frame": "Frame",
       "video": "Video"
@@ -258,6 +259,8 @@
       "shotSplit": "Shot Decomposition",
       "frameGenerateFirst": "First Frame",
       "frameGenerateLast": "Last Frame",
+      "sceneFrameGenerate": "Scene Reference Frame",
+      "sceneFrameGenerateDesc": "Prompt for scene frame generation in reference mode",
       "videoGenerate": "Video Generation",
       "refVideoGenerate": "Reference Video",
       "refVideoPrompt": "Video Prompt Generation"
@@ -287,6 +290,7 @@
       "slots": "Slots",
       "slotsCount": "{count} slots"
     },
+    "editPrompt": "Prompt",
     "project": {
       "useProjectPrompts": "Use project-specific prompts",
       "useProjectPromptsDesc": "When disabled, uses global defaults. Enable to customize for this project.",
@@ -396,7 +400,11 @@
       "motionRules": "Motion Rules",
       "motionRulesDesc": "Writing rules for video motion descriptions",
       "qualityBenchmark": "Quality Benchmark",
-      "qualityBenchmarkDesc": "Quality benchmark with good/bad examples"
+      "qualityBenchmarkDesc": "Quality benchmark with good/bad examples",
+      "compositionRules": "Composition Rules",
+      "compositionRulesDesc": "Scene composition and layout requirements",
+      "rendering": "Rendering Quality",
+      "renderingDesc": "Rendering and lighting quality requirements"
     }
   }
 }

@@ -242,8 +242,9 @@
     "subtitle": "AI 生成フローのプロンプトテンプレートを管理",
     "categories": {
       "all": "すべて",
-      "script": "脚本生成",
+      "script": "脚本",
       "character": "キャラクター",
+      "storyboard": "ストーリーボード",
       "shot": "ストーリーボード",
       "frame": "フレーム",
       "video": "動画"
@@ -258,6 +259,8 @@
       "shotSplit": "ショット分解",
       "frameGenerateFirst": "最初のフレーム",
       "frameGenerateLast": "最後のフレーム",
+      "sceneFrameGenerate": "シーン参照フレーム",
+      "sceneFrameGenerateDesc": "参照モードでのシーンフレーム生成プロンプト",
       "videoGenerate": "動画生成",
       "refVideoGenerate": "参照動画生成",
       "refVideoPrompt": "動画プロンプト生成"
@@ -287,6 +290,7 @@
       "slots": "スロット",
       "slotsCount": "{count} 個のスロット"
     },
+    "editPrompt": "プロンプト",
     "project": {
       "useProjectPrompts": "プロジェクト固有のプロンプトを使用",
       "useProjectPromptsDesc": "無効時はグローバルデフォルトを使用。有効にするとこのプロジェクト用にカスタマイズできます。",
@@ -396,7 +400,11 @@
       "motionRules": "モーションルール",
       "motionRulesDesc": "ビデオモーション説明のライティングルール",
       "qualityBenchmark": "品質基準",
-      "qualityBenchmarkDesc": "良い/悪い例による品質基準"
+      "qualityBenchmarkDesc": "良い/悪い例による品質基準",
+      "compositionRules": "構図ルール",
+      "compositionRulesDesc": "シーン構図とレイアウト要件",
+      "rendering": "レンダリング品質",
+      "renderingDesc": "レンダリングとライティングの品質要件"
     }
   }
 }

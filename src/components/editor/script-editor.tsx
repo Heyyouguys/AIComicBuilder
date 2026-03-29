@@ -10,6 +10,7 @@ import { Sparkles, Loader2, FileText, Lightbulb } from "lucide-react";
 import { InlineModelPicker } from "@/components/editor/model-selector";
 import { apiFetch } from "@/lib/api-fetch";
 import { useModelGuard } from "@/hooks/use-model-guard";
+import { PromptEditButton } from "@/components/prompt-templates/prompt-edit-button";
 import { toast } from "sonner";
 
 export function ScriptEditor() {
@@ -134,6 +135,7 @@ export function ScriptEditor() {
           </h2>
         </div>
         <div className="flex items-center gap-2">
+          <PromptEditButton promptKeys="script_generate" projectId={project.id} />
           <InlineModelPicker capability="text" />
           {saving && (
             <span className="flex items-center gap-1.5 text-xs text-[--text-muted]">

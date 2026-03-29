@@ -60,7 +60,7 @@ export default function ProjectLayout({
         </div>
         <div className="flex items-center gap-1">
           <Link
-            href={`/${locale}/project/${id}/prompts`}
+            href={`/${locale}/settings/prompts?scope=project&projectId=${id}`}
             title="项目提示词"
             className="flex h-8 w-8 items-center justify-center rounded-lg text-[--text-muted] transition-all hover:bg-[--surface] hover:text-[--text-primary]"
           >

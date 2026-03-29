@@ -242,8 +242,9 @@
     "subtitle": "AI 생성 흐름의 프롬프트 템플릿 관리",
     "categories": {
       "all": "전체",
-      "script": "각본 생성",
+      "script": "각본",
       "character": "캐릭터",
+      "storyboard": "스토리보드",
       "shot": "스토리보드",
       "frame": "프레임",
       "video": "영상"
@@ -258,6 +259,8 @@
       "shotSplit": "샷 분해",
       "frameGenerateFirst": "첫 번째 프레임",
       "frameGenerateLast": "마지막 프레임",
+      "sceneFrameGenerate": "씬 참조 프레임",
+      "sceneFrameGenerateDesc": "참조 모드에서 씬 프레임 생성 프롬프트",
       "videoGenerate": "영상 생성",
       "refVideoGenerate": "참조 영상 생성",
       "refVideoPrompt": "영상 프롬프트 생성"
@@ -287,6 +290,7 @@
       "slots": "슬롯",
       "slotsCount": "슬롯 {count}개"
     },
+    "editPrompt": "프롬프트",
     "project": {
       "useProjectPrompts": "프로젝트 전용 프롬프트 사용",
       "useProjectPromptsDesc": "비활성화 시 글로벌 기본값 사용. 활성화하면 이 프로젝트에 맞게 커스터마이즈할 수 있습니다.",
@@ -396,7 +400,11 @@
       "motionRules": "모션 규칙",
       "motionRulesDesc": "영상 모션 설명 작성 규칙",
       "qualityBenchmark": "품질 기준",
-      "qualityBenchmarkDesc": "좋은/나쁜 예시에 의한 품질 기준"
+      "qualityBenchmarkDesc": "좋은/나쁜 예시에 의한 품질 기준",
+      "compositionRules": "구도 규칙",
+      "compositionRulesDesc": "씬 구도 및 레이아웃 요구사항",
+      "rendering": "렌더링 품질",
+      "renderingDesc": "렌더링 및 조명 품질 요구사항"
     }
   }
 }

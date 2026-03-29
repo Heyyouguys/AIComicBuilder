@@ -299,6 +299,7 @@ export function ProjectPromptCards({ projectId }: ProjectPromptCardsProps) {
           })}
         </div>
       )}
+
     </div>
   );
 }

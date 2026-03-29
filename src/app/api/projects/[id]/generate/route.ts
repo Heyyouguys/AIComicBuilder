@@ -14,7 +14,7 @@ import { buildScriptParsePrompt } from "@/lib/ai/prompts/script-parse";
 import { buildScriptGeneratePrompt } from "@/lib/ai/prompts/script-generate";
 import { buildCharacterExtractPrompt } from "@/lib/ai/prompts/character-extract";
 import { buildShotSplitPrompt } from "@/lib/ai/prompts/shot-split";
-import { resolvePrompt } from "@/lib/ai/prompts/resolver";
+import { resolvePrompt, resolveSlotContents } from "@/lib/ai/prompts/resolver";
 import { getModelMaxDuration } from "@/lib/ai/model-limits";
 import {
   buildFirstFramePrompt,
@@ -164,11 +164,11 @@ export async function POST(
   }
 
   if (action === "single_scene_frame") {
-    return handleSingleSceneFrame(projectId, payload, modelConfig);
+    return handleSingleSceneFrame(projectId, userId, payload, modelConfig);
   }
 
   if (action === "batch_scene_frame") {
-    return handleBatchSceneFrame(projectId, payload, modelConfig, episodeId);
+    return handleBatchSceneFrame(projectId, userId, payload, modelConfig, episodeId);
   }
 
   if (action === "single_reference_video") {
@@ -374,72 +374,76 @@ async function handleCharacterExtract(
 
   const model = createLanguageModel(modelConfig.text);
   const charExtractSystem = await resolvePrompt("character_extract", { userId, projectId });
+  console.log("[CharacterExtract] resolved system prompt:\n", charExtractSystem);
 
-  const result = streamText({
+  const { text } = await generateText({
     model,
     system: charExtractSystem,
     prompt: buildCharacterExtractPrompt(script),
-    onFinish: async ({ text }) => {
-      try {
-        const extracted = JSON.parse(extractJSON(text)) as Array<{
-          name: string;
-          description: string;
-          visualHint?: string;
-          scope?: string;
-        }>;
-
-        let reusedCount = 0;
-        let createdCount = 0;
-        const linkedCharIds: string[] = [];
-
-        for (const char of extracted) {
-          const key = char.name.toLowerCase().trim();
-          const existing = existingByName.get(key);
-
-          if (existing) {
-            // Reuse existing character
-            linkedCharIds.push(existing.id);
-            reusedCount++;
-          } else {
-            // Create new character
-            const charId = ulid();
-            const scope = char.scope === "guest" ? "guest" : "main";
-            await db.insert(characters).values({
-              id: charId,
-              projectId,
-              name: char.name,
-              description: char.description,
-              visualHint: char.visualHint ?? "",
-              scope,
-              episodeId: null,
-            });
-            existingByName.set(key, { id: charId, name: char.name } as typeof existingChars[0]);
-            linkedCharIds.push(charId);
-            createdCount++;
-          }
-        }
-
-        // Create episode_characters links
-        if (episodeId) {
-          for (const charId of linkedCharIds) {
-            await db.insert(episodeCharacters).values({
-              id: ulid(),
-              episodeId,
-              characterId: charId,
-            });
-          }
-        }
-
-        console.log(
-          `[CharacterExtract] ${extracted.length} characters: ${reusedCount} reused, ${createdCount} new, ${linkedCharIds.length} linked to episode`
-        );
-      } catch (err) {
-        console.error("[CharacterExtract] onFinish error:", err);
-      }
-    },
   });
 
-  return result.toTextStreamResponse();
+  const extracted = JSON.parse(extractJSON(text)) as Array<{
+    name: string;
+    description: string;
+    visualHint?: string;
+    scope?: string;
+  }>;
+
+  let reusedCount = 0;
+  let createdCount = 0;
+  const linkedCharIds: string[] = [];
+
+  for (const char of extracted) {
+    const key = char.name.toLowerCase().trim();
+    const existing = existingByName.get(key);
+
+    if (existing) {
+      // Reuse existing character — always update description from new extraction
+      await db.update(characters)
+        .set({
+          description: char.description,
+          visualHint: char.visualHint ?? existing.visualHint ?? "",
+          scope: (char.scope === "guest" ? "guest" : "main") as "main" | "guest",
+        })
+        .where(eq(characters.id, existing.id));
+      console.log(`[CharacterExtract] Updated existing character "${char.name}" (${existing.id}), desc length: ${char.description.length}`);
+      linkedCharIds.push(existing.id);
+      reusedCount++;
+    } else {
+      // Create new character
+      const charId = ulid();
+      const scope = char.scope === "guest" ? "guest" : "main";
+      await db.insert(characters).values({
+        id: charId,
+        projectId,
+        name: char.name,
+        description: char.description,
+        visualHint: char.visualHint ?? "",
+        scope,
+        episodeId: null,
+      });
+      existingByName.set(key, { id: charId, name: char.name } as typeof existingChars[0]);
+      linkedCharIds.push(charId);
+      createdCount++;
+    }
+  }
+
+  // Create episode_characters links
+  if (episodeId) {
+    for (const charId of linkedCharIds) {
+      await db.insert(episodeCharacters).values({
+        id: ulid(),
+        episodeId,
+        characterId: charId,
+      });
+    }
+  }
+
+  console.log(
+    `[CharacterExtract] ${extracted.length} characters: ${reusedCount} reused, ${createdCount} new, ${linkedCharIds.length} linked to episode`
+  );
+
+  return NextResponse.json({ characters: extracted });
 }
 
 // --- single_character_image: generate turnaround image for one character ---
@@ -1437,6 +1441,7 @@ async function handleBatchVideoGenerate(
 
 async function handleSingleSceneFrame(
   projectId: string,
+  userId: string,
   payload?: Record<string, unknown>,
   modelConfig?: ModelConfig
 ) {
@@ -1480,6 +1485,7 @@ async function handleSingleSceneFrame(
     await db.update(shots).set({ status: "generating" }).where(eq(shots.id, shotId));
 
     const imageProvider = resolveImageProvider(modelConfig, versionedUploadDir);
+    const slotContents = await resolveSlotContents("scene_frame_generate", { userId, projectId });
     const sceneFramePrompt = buildSceneFramePrompt({
       sceneDescription: shot.prompt || "",
       charRefMapping,
@@ -1487,6 +1493,7 @@ async function handleSingleSceneFrame(
       cameraDirection: shot.cameraDirection,
       startFrameDesc: shot.startFrameDesc,
       motionScript: shot.motionScript,
+      slotContents,
     });
 
     console.log(`[SingleSceneFrame] Shot ${shot.sequence}: generating scene frame, mapping="${charRefMapping}"`);
@@ -1516,6 +1523,7 @@ async function handleSingleSceneFrame(
 
 async function handleBatchSceneFrame(
   projectId: string,
+  userId: string,
   payload?: Record<string, unknown>,
   modelConfig?: ModelConfig,
   episodeId?: string
@@ -1566,6 +1574,7 @@ async function handleBatchSceneFrame(
     .join("\n");
 
   const imageProvider = resolveImageProvider(modelConfig, versionedUploadDir);
+  const sceneSlotContents = await resolveSlotContents("scene_frame_generate", { userId, projectId });
 
   await Promise.all(
     eligible.map((shot) =>
@@ -1589,6 +1598,7 @@ async function handleBatchSceneFrame(
         characterDescriptions,
         cameraDirection: shot.cameraDirection,
         startFrameDesc: shot.startFrameDesc,
+        slotContents: sceneSlotContents,
         motionScript: shot.motionScript,
       });
 
@@ -1697,6 +1707,7 @@ async function handleSingleReferenceVideo(
     let sceneFramePath = shot.sceneRefFrame ?? null;
     if (!sceneFramePath) {
       const imageProvider = resolveImageProvider(modelConfig, versionedUploadDir);
+      const refSlotContents = await resolveSlotContents("scene_frame_generate", { userId, projectId });
       const sceneFramePrompt = buildSceneFramePrompt({
         sceneDescription: shot.prompt || "",
         charRefMapping,
@@ -1704,6 +1715,7 @@ async function handleSingleReferenceVideo(
         cameraDirection: shot.cameraDirection,
         startFrameDesc: shot.startFrameDesc,
         motionScript: shot.motionScript,
+        slotContents: refSlotContents,
       });
       console.log(`[SingleReferenceVideo] Shot ${shot.sequence}: generating scene frame, mapping="${charRefMapping}"`);
       sceneFramePath = await imageProvider.generateImage(sceneFramePrompt, {
@@ -1886,6 +1898,7 @@ async function handleBatchReferenceVideo(
         });
 
         // Step 1: Generate scene reference frame (Toonflow-style)
+        const batchRefSlots = await resolveSlotContents("scene_frame_generate", { userId, projectId });
         const sceneFramePrompt = buildSceneFramePrompt({
           sceneDescription: shot.prompt || "",
           charRefMapping,
@@ -1893,6 +1906,7 @@ async function handleBatchReferenceVideo(
           cameraDirection: shot.cameraDirection,
           startFrameDesc: shot.startFrameDesc,
           motionScript: shot.motionScript,
+          slotContents: batchRefSlots,
         });
 
         console.log(`[BatchReferenceVideo] Shot ${shot.sequence}: generating scene frame, mapping="${charRefMapping}"`);

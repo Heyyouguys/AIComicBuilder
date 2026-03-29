@@ -242,8 +242,9 @@
     "subtitle": "管理 AI 生成流程中的提示词模板",
     "categories": {
       "all": "全部",
-      "script": "剧本生成",
+      "script": "剧本",
       "character": "角色",
+      "storyboard": "分镜",
       "shot": "分镜",
       "frame": "画面",
       "video": "视频"
@@ -258,6 +259,8 @@
       "shotSplit": "分镜拆分",
       "frameGenerateFirst": "首帧生成",
       "frameGenerateLast": "尾帧生成",
+      "sceneFrameGenerate": "场景参考帧",
+      "sceneFrameGenerateDesc": "基于参考图模式下的场景帧生成提示词",
       "videoGenerate": "视频生成",
       "refVideoGenerate": "参考视频生成",
       "refVideoPrompt": "视频提示词生成"
@@ -287,6 +290,7 @@
       "slots": "插槽",
       "slotsCount": "{count} 个插槽"
     },
+    "editPrompt": "提示词",
     "project": {
       "useProjectPrompts": "使用项目专属提示词",
       "useProjectPromptsDesc": "关闭时使用全局默认配置，开启后可针对此项目自定义",
@@ -396,7 +400,11 @@
       "motionRules": "动作规则",
       "motionRulesDesc": "视频动作描述的写作规则",
       "qualityBenchmark": "质量基准",
-      "qualityBenchmarkDesc": "好/差示例的质量基准"
+      "qualityBenchmarkDesc": "好/差示例的质量基准",
+      "compositionRules": "构图规则",
+      "compositionRulesDesc": "场景构图和画面布局要求",
+      "rendering": "渲染质量",
+      "renderingDesc": "画面渲染和光线质量要求"
     }
   }
 }

@@ -31,6 +31,7 @@ import { GenerationModeTab } from "@/components/editor/generation-mode-tab";
 import { ShotDrawer } from "@/components/editor/shot-drawer";
 import { CharactersInlinePanel } from "@/components/editor/characters-inline-panel";
 import { ShotKanban } from "@/components/editor/shot-kanban";
+import { PromptEditButton } from "@/components/prompt-templates/prompt-edit-button";
 import Link from "next/link";
 
 export default function EpisodeStoryboardPage() {
@@ -361,6 +362,14 @@ export default function EpisodeStoryboardPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <PromptEditButton
+            promptKeys={
+              generationMode === "reference"
+                ? ["shot_split", "scene_frame_generate"]
+                : "shot_split"
+            }
+            projectId={project.id}
+          />
           {totalShots > 0 && (
             <div className="inline-flex gap-1 rounded-xl border border-[--border-subtle] bg-[--surface] p-1">
               <button
