@@ -146,17 +146,65 @@ export function ScriptEditor() {
     setGenerating(true);
 
     const idea = project.idea || "";
-    updateScript("");
+    const currentEpisodeId = useProjectStore.getState().currentEpisodeId;
+    let currentOutline = outline;
 
     try {
+      // Step 1: Auto-generate outline if empty
+      if (!currentOutline.trim()) {
+        setGeneratingOutline(true);
+        toast.info(t("project.generatingOutlineFirst") || "Generating outline first...");
+
+        const outlineResp = await apiFetch(`/api/projects/${project.id}/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "script_outline",
+            payload: { idea },
+            modelConfig: getModelConfig(),
+            episodeId: currentEpisodeId,
+          }),
+        });
+
+        if (outlineResp.ok) {
+          const data = await outlineResp.json();
+          if (data.id) {
+            // Poll for outline task completion
+            let attempts = 0;
+            while (attempts < 60) {
+              await new Promise((r) => setTimeout(r, 2000));
+              const taskResp = await apiFetch(`/api/tasks/${data.id}`);
+              const taskData = await taskResp.json();
+              if (taskData.status === "completed") {
+                // Refresh project to get the generated outline
+                await fetchProject(project.id, currentEpisodeId ?? undefined);
+                const updatedProject = useProjectStore.getState().project;
+                currentOutline = updatedProject?.outline || "";
+                setOutline(currentOutline);
+                break;
+              }
+              if (taskData.status === "failed") {
+                console.warn("Outline generation failed, proceeding without outline");
+                break;
+              }
+              attempts++;
+            }
+          }
+        }
+        setGeneratingOutline(false);
+      }
+
+      // Step 2: Generate script (with outline if available)
+      updateScript("");
+
       const response = await apiFetch(`/api/projects/${project.id}/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "script_generate",
-          payload: { idea, outline: outline || undefined },
+          payload: { idea, outline: currentOutline || undefined },
           modelConfig: getModelConfig(),
-          episodeId: useProjectStore.getState().currentEpisodeId,
+          episodeId: currentEpisodeId,
         }),
       });
 
@@ -173,12 +221,13 @@ export function ScriptEditor() {
         }
       }
 
-      await fetchProject(project.id, useProjectStore.getState().currentEpisodeId ?? undefined);
+      await fetchProject(project.id, currentEpisodeId ?? undefined);
     } catch (err) {
       console.error("Script generate error:", err);
       toast.error(t("common.generationFailed"));
     }
 
+    setGeneratingOutline(false);
     setGenerating(false);
   }
 
