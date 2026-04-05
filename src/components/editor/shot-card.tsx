@@ -781,84 +781,78 @@ export function ShotCard({
           {/* Frame thumbnails */}
           {generationMode === "reference" ? (
             <div className="mb-2.5 space-y-2">
-              {/* Reference images grid */}
-              <div className="grid grid-cols-3 gap-2">
+              {/* Scene ref frame — same style as keyframe thumbnails */}
+              <div className="flex gap-2">
+                <div className="flex flex-col gap-1" style={{ width: "50%" }}>
+                  <div
+                    className={`relative overflow-hidden rounded-lg border border-[--border-subtle] bg-[--surface] ${sceneRefFrame ? "cursor-pointer hover:opacity-80 transition-opacity" : ""}`}
+                    onClick={() => sceneRefFrame && setPreviewSrc(uploadUrl(sceneRefFrame))}
+                  >
+                    {sceneRefFrame ? (
+                      <img src={uploadUrl(sceneRefFrame)} className="w-full object-contain" />
+                    ) : (
+                      <div className="flex h-16 items-center justify-center"><ImageIcon className="h-4 w-4 text-[--text-muted]" /></div>
+                    )}
+                  </div>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => handleUploadFrame("sceneRefFrame")}
+                      className="flex flex-1 items-center justify-center gap-1 rounded-md border border-[--border-subtle] bg-white py-0.5 text-[10px] text-[--text-muted] transition-colors hover:border-primary/40 hover:text-primary"
+                    >
+                      <Upload className="h-2.5 w-2.5" />
+                      {t("shot.sceneRefFrame")}
+                    </button>
+                    {sceneRefFrame && (
+                      <button
+                        onClick={() => handleClearFrame("sceneRefFrame")}
+                        className="flex items-center justify-center rounded-md border border-[--border-subtle] bg-white px-1.5 py-0.5 text-[10px] text-[--text-muted] transition-colors hover:border-red-300 hover:text-red-500"
+                      >
+                        <Trash2 className="h-2.5 w-2.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Reference images — compact row */}
                 {parsedRefImages.map((img, idx) => (
-                  <div key={idx} className="relative group">
+                  <div key={idx} className="flex flex-col gap-1" style={{ width: "50%" }}>
                     <div
-                      className="overflow-hidden rounded-lg border border-[--border-subtle] bg-[--surface] cursor-pointer hover:opacity-80 transition-opacity aspect-video"
+                      className="relative overflow-hidden rounded-lg border border-[--border-subtle] bg-[--surface] cursor-pointer hover:opacity-80 transition-opacity group"
                       onClick={() => setPreviewSrc(uploadUrl(img))}
                     >
-                      <img src={uploadUrl(img)} className="w-full h-full object-cover" />
+                      <img src={uploadUrl(img)} className="w-full object-contain" />
+                      <div className="absolute top-0.5 right-0.5 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleRegenerateRefImage(idx); }}
+                          className="rounded bg-black/60 p-0.5 text-white hover:bg-black/80"
+                        >
+                          <RefreshCw className="h-2.5 w-2.5" />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleRemoveRefImage(idx); }}
+                          className="rounded bg-black/60 p-0.5 text-white hover:bg-red-600/80"
+                        >
+                          <Trash2 className="h-2.5 w-2.5" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleRegenerateRefImage(idx); }}
-                        className="rounded bg-black/60 p-0.5 text-white hover:bg-black/80"
-                        title="Regenerate"
-                      >
-                        <RefreshCw className="h-3 w-3" />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleRemoveRefImage(idx); }}
-                        className="rounded bg-black/60 p-0.5 text-white hover:bg-red-600/80"
-                        title="Remove"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                    <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1 text-[9px] text-white">
-                      {idx + 1}
-                    </span>
+                    <span className="text-center text-[10px] text-[--text-muted]">{t("shot.referenceImages")} {idx + 1}</span>
                   </div>
                 ))}
 
-                {/* Add reference image button */}
+                {/* Add button — small, matching frame style */}
                 {parsedRefImages.length < 9 && (
-                  <button
-                    onClick={handleAddRefImage}
-                    className="flex items-center justify-center rounded-lg border-2 border-dashed border-[--border-subtle] aspect-video text-[--text-muted] hover:border-primary/40 hover:text-primary transition-colors"
-                  >
-                    <Plus className="h-5 w-5" />
-                  </button>
+                  <div className="flex flex-col gap-1" style={{ width: "50%" }}>
+                    <button
+                      onClick={handleAddRefImage}
+                      className="flex h-16 items-center justify-center rounded-lg border border-dashed border-[--border-subtle] bg-[--surface] text-[--text-muted] hover:border-primary/40 hover:text-primary transition-colors"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="text-center text-[10px] text-[--text-muted]">{t("shot.addRefImage")}</span>
+                  </div>
                 )}
               </div>
-
-              {/* Also show sceneRefFrame if it exists and is not in the ref images list */}
-              {sceneRefFrame && !parsedRefImages.includes(sceneRefFrame) && (
-                <div className="flex items-center gap-2 text-xs text-[--text-muted]">
-                  <img src={uploadUrl(sceneRefFrame)} className="h-10 w-16 rounded border object-cover" />
-                  <span>{t("shot.sceneRefFrame")}</span>
-                  <div className="flex gap-1 ml-auto">
-                    <button
-                      onClick={() => handleUploadFrame("sceneRefFrame")}
-                      className="flex items-center gap-1 rounded-md border border-[--border-subtle] bg-white px-1.5 py-0.5 text-[10px] text-[--text-muted] hover:border-primary/40 hover:text-primary"
-                    >
-                      <Upload className="h-2.5 w-2.5" />
-                    </button>
-                    <button
-                      onClick={() => handleClearFrame("sceneRefFrame")}
-                      className="flex items-center rounded-md border border-[--border-subtle] bg-white px-1.5 py-0.5 text-[10px] text-[--text-muted] hover:border-red-300 hover:text-red-500"
-                    >
-                      <Trash2 className="h-2.5 w-2.5" />
-                    </button>
-                  </div>
-                </div>
-              )}
-              {!sceneRefFrame && (
-                <div className="flex items-center gap-2">
-                  <div className="flex h-10 w-16 items-center justify-center rounded border border-[--border-subtle] bg-[--surface]">
-                    <ImageIcon className="h-3.5 w-3.5 text-[--text-muted]" />
-                  </div>
-                  <span className="text-xs text-[--text-muted]">{t("shot.sceneRefFrame")}</span>
-                  <button
-                    onClick={() => handleUploadFrame("sceneRefFrame")}
-                    className="ml-auto flex items-center gap-1 rounded-md border border-[--border-subtle] bg-white px-1.5 py-0.5 text-[10px] text-[--text-muted] hover:border-primary/40 hover:text-primary"
-                  >
-                    <Upload className="h-2.5 w-2.5" />
-                  </button>
-                </div>
-              )}
             </div>
           ) : (
             <div className="mb-2.5 flex gap-2">

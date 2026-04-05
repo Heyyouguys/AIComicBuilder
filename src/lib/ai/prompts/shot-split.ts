@@ -48,11 +48,21 @@ Output a JSON array of SCENES. Each scene groups related shots that share the sa
         "soundDesign": "environmental/ambient sounds for this shot",
         "musicCue": "music direction for this shot",
         "transitionIn": "cut",
-        "transitionOut": "cut"
+        "transitionOut": "cut",
+        "referenceImagePrompts": ["description of reference image 1 to generate", "description of reference image 2"]
       }
     ]
   }
 ]
+
+=== referenceImagePrompts ===
+- Array of 0-4 image generation prompts for reference images this shot needs
+- Each prompt describes a specific reference image the AI video generator should use for consistency
+- Typical uses: character close-up for face consistency, key prop/object, specific environment/setting
+- If the shot only has one character in a simple setting, 1-2 reference images suffice
+- If the shot has multiple characters or complex props, use 2-4
+- Each prompt should be a complete image generation prompt (style, subject, details)
+- Leave empty array [] if no reference images needed (e.g., text-only shots)
 
 === compositionGuide ===
 - "compositionGuide": recommended composition technique for this shot. Values: "rule_of_thirds" | "golden_ratio" | "symmetric" | "diagonal" | "frame_within_frame" | "leading_lines" | "center_dominant". Choose based on scene mood and action.

@@ -1785,10 +1785,36 @@ async function handleBatchSceneFrame(
         referenceImages: charRefs.map((c) => c.imagePath),
       });
 
-      await db
-        .update(shots)
-        .set({ sceneRefFrame: sceneFramePath, status: "pending" })
-        .where(eq(shots.id, shot.id));
+      // Auto-generate reference images from AI-provided prompts
+      const refImagesRaw: string[] = shot.referenceImages ? JSON.parse(shot.referenceImages as string) : [];
+      const promptEntries = refImagesRaw.filter((r) => r.startsWith("prompt:"));
+      const existingImages = refImagesRaw.filter((r) => !r.startsWith("prompt:"));
+
+      if (promptEntries.length > 0) {
+        const generatedRefs = [...existingImages];
+        for (const entry of promptEntries) {
+          const refPrompt = entry.replace(/^prompt:/, "");
+          try {
+            const refPath = await imageProvider.generateImage(refPrompt, {
+              quality: "hd",
+              referenceImages: charRefs.map((c) => c.imagePath),
+            });
+            generatedRefs.push(refPath);
+            console.log(`[BatchSceneFrame] Shot ${shot.sequence}: generated ref image from prompt`);
+          } catch (refErr) {
+            console.warn(`[BatchSceneFrame] Shot ${shot.sequence}: ref image generation failed, skipping:`, refErr);
+          }
+        }
+        await db
+          .update(shots)
+          .set({ sceneRefFrame: sceneFramePath, referenceImages: JSON.stringify(generatedRefs), status: "pending" })
+          .where(eq(shots.id, shot.id));
+      } else {
+        await db
+          .update(shots)
+          .set({ sceneRefFrame: sceneFramePath, status: "pending" })
+          .where(eq(shots.id, shot.id));
+      }
 
       results.push({ shotId: shot.id, sequence: shot.sequence, status: "ok", sceneRefFrame: sceneFramePath });
     } catch (err) {
