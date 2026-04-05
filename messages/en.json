@@ -105,7 +105,10 @@
     "guestSection": "Guest Characters",
     "noMain": "No main characters yet",
     "noGuest": "No guest characters yet",
-    "deleteConfirm": "Are you sure you want to delete \"{name}\"?"
+    "deleteConfirm": "Are you sure you want to delete \"{name}\"?",
+    "relations": "Character Relations",
+    "relationDesc": "Description (optional)",
+    "addRelation": "Add"
   },
   "shot": {
     "sequence": "Shot {number}",

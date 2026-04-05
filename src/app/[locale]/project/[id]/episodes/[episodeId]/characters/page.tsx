@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useProjectStore } from "@/stores/project-store";
 import { useModelStore } from "@/stores/model-store";
 import { CharacterCard } from "@/components/editor/character-card";
+import { CharacterRelations } from "@/components/editor/character-relations";
 import { Button } from "@/components/ui/button";
 import { useTranslations } from "next-intl";
 import { Users, Sparkles, ImageIcon, Loader2 } from "lucide-react";
@@ -154,6 +155,15 @@ export default function EpisodeCharactersPage() {
           </p>
         </div>
       ) : (
+        <>
+        {project.characters.length >= 2 && (
+          <div className="mb-4">
+            <CharacterRelations
+              projectId={project.id}
+              characters={project.characters.map((c) => ({ id: c.id, name: c.name }))}
+            />
+          </div>
+        )}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {project.characters.map((char) => (
             <CharacterCard
@@ -185,6 +195,7 @@ export default function EpisodeCharactersPage() {
             />
           ))}
         </div>
+        </>
       )}
     </div>
   );

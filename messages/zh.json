@@ -105,7 +105,10 @@
     "guestSection": "配角",
     "noMain": "还没有主角",
     "noGuest": "还没有配角",
-    "deleteConfirm": "确定要删除角色「{name}」吗？"
+    "deleteConfirm": "确定要删除角色「{name}」吗？",
+    "relations": "角色关系",
+    "relationDesc": "描述（可选）",
+    "addRelation": "添加"
   },
   "shot": {
     "sequence": "第 {number} 个分镜",

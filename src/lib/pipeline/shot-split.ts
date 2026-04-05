@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { shots, dialogues, characters } from "@/lib/db/schema";
+import { shots, dialogues, characters, characterRelations } from "@/lib/db/schema";
 import { resolveAIProvider } from "@/lib/ai/provider-factory";
 import type { ModelConfigPayload } from "@/lib/ai/provider-factory";
 import { buildShotSplitPrompt } from "@/lib/ai/prompts/shot-split";
@@ -31,14 +31,34 @@ export async function handleShotSplit(task: Task) {
     .map((c) => `${c.name}: ${c.description}`)
     .join("\n");
 
+  // Load character relations
+  const relations = await db
+    .select()
+    .from(characterRelations)
+    .where(eq(characterRelations.projectId, payload.projectId));
+
+  let relationsText = "";
+  if (relations.length > 0) {
+    relationsText = "\n\n## CHARACTER RELATIONSHIPS\n";
+    for (const rel of relations) {
+      const charA = projectCharacters.find(c => c.id === rel.characterAId);
+      const charB = projectCharacters.find(c => c.id === rel.characterBId);
+      if (charA && charB) {
+        relationsText += `- ${charA.name} \u2194 ${charB.name}: ${rel.relationType}${rel.description ? ` (${rel.description})` : ""}\n`;
+      }
+    }
+    relationsText += "\nUse these relationships to inform framing, character proximity, and eye direction in compositions.\n";
+  }
+
   const systemPrompt = await resolvePrompt("shot_split", {
     userId: payload.userId ?? "",
     projectId: payload.projectId,
   });
 
   const ai = resolveAIProvider(payload.modelConfig);
+  const userPrompt = buildShotSplitPrompt(payload.screenplay, characterDescriptions) + relationsText;
   const result = await ai.generateText(
-    buildShotSplitPrompt(payload.screenplay, characterDescriptions),
+    userPrompt,
     { systemPrompt, temperature: 0.5 }
   );
 

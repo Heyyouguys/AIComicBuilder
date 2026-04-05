@@ -105,7 +105,10 @@
     "guestSection": "게스트 캐릭터",
     "noMain": "아직 메인 캐릭터가 없습니다",
     "noGuest": "아직 게스트 캐릭터가 없습니다",
-    "deleteConfirm": "\"{name}\"을(를) 삭제하시겠습니까?"
+    "deleteConfirm": "\"{name}\"을(를) 삭제하시겠습니까?",
+    "relations": "캐릭터 관계",
+    "relationDesc": "설명 (선택사항)",
+    "addRelation": "추가"
   },
   "shot": {
     "sequence": "샷 {number}",

@@ -199,6 +199,24 @@ export const promptPresets = sqliteTable("prompt_presets", {
     .$defaultFn(() => new Date()),
 });
 
+export const characterRelations = sqliteTable("character_relations", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  characterAId: text("character_a_id")
+    .notNull()
+    .references(() => characters.id, { onDelete: "cascade" }),
+  characterBId: text("character_b_id")
+    .notNull()
+    .references(() => characters.id, { onDelete: "cascade" }),
+  relationType: text("relation_type").notNull().default("neutral"),
+  description: text("description").default(""),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
 export const tasks = sqliteTable("tasks", {
   id: text("id").primaryKey(),
   projectId: text("project_id").references(() => projects.id, {

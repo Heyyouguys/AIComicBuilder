@@ -105,7 +105,10 @@
     "guestSection": "ゲストキャラクター",
     "noMain": "メインキャラクターがまだいません",
     "noGuest": "ゲストキャラクターがまだいません",
-    "deleteConfirm": "「{name}」を削除してもよろしいですか？"
+    "deleteConfirm": "「{name}」を削除してもよろしいですか？",
+    "relations": "キャラクター関係",
+    "relationDesc": "説明（任意）",
+    "addRelation": "追加"
   },
   "shot": {
     "sequence": "ショット {number}",

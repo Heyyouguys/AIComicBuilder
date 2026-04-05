@@ -5,6 +5,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { Users, ArrowLeft, Loader2, Trash2 } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
 import { CharacterCard } from "@/components/editor/character-card";
+import { CharacterRelations } from "@/components/editor/character-relations";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -168,6 +169,16 @@ export default function CharactersPage({
           </div>
         )}
       </section>
+
+      {/* Character Relations */}
+      {characters.length >= 2 && (
+        <section className="mb-8">
+          <CharacterRelations
+            projectId={projectId}
+            characters={characters.map((c) => ({ id: c.id, name: c.name }))}
+          />
+        </section>
+      )}
 
       {/* Guest Characters Section */}
       <section>
