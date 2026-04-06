@@ -82,6 +82,7 @@ export default function ImportPage({
 
   // Step 2 result
   const [characters, setCharacters] = useState<ExtractedCharacter[]>([]);
+  const [relationships, setRelationships] = useState<Array<{ characterA: string; characterB: string; relationType: string; description?: string }>>([]);
 
   // Step 3 result
   const [episodes, setEpisodes] = useState<SplitEpisode[]>([]);
@@ -196,6 +197,7 @@ export default function ImportPage({
       }
       const data = await res.json();
       setCharacters(data.characters);
+      setRelationships(data.relationships || []);
       const mainCount = data.characters.filter((c: ExtractedCharacter) => c.scope === "main").length;
       const guestCount = data.characters.length - mainCount;
       addLog(2, "done", `提取完成: ${mainCount} 个主角, ${guestCount} 个配角`);
@@ -228,6 +230,7 @@ export default function ImportPage({
       }
       const data = await res.json();
       setCharacters(data.characters);
+      setRelationships(data.relationships || []);
       const mainCount = data.characters.filter((c: ExtractedCharacter) => c.scope === "main").length;
       const guestCount = data.characters.length - mainCount;
       addLog(2, "done", `提取完成: ${mainCount} 个主角, ${guestCount} 个配角`);
@@ -285,6 +288,7 @@ export default function ImportPage({
         body: JSON.stringify({
           episodes,
           characters,
+          relationships,
         }),
       });
       if (!res.ok) {
