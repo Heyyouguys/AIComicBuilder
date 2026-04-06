@@ -1319,14 +1319,14 @@ const refImagePromptsDef: PromptDefinition = {
   descriptionKey: "promptTemplates.prompts.refImagePromptsDesc",
   category: "frame",
   slots: [
-    slot("role_definition", REF_IMAGE_PROMPTS_ROLE, true),
-    slot("writing_rules", REF_IMAGE_PROMPTS_RULES, true),
-    slot("output_format", REF_IMAGE_PROMPTS_FORMAT, false),
+    slot("ref_image_role", REF_IMAGE_PROMPTS_ROLE, true),
+    slot("ref_image_rules", REF_IMAGE_PROMPTS_RULES, true),
+    slot("ref_image_output", REF_IMAGE_PROMPTS_FORMAT, false),
   ],
   buildFullPrompt(sc) {
     const s = this.slots;
     const r = (k: string) => resolve(sc, s, k);
-    return [r("role_definition"), "", r("writing_rules"), "", r("output_format")].join("\n");
+    return [r("ref_image_role"), "", r("ref_image_rules"), "", r("ref_image_output")].join("\n");
   },
 };
 
