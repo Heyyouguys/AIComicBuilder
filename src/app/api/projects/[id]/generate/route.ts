@@ -1765,137 +1765,68 @@ async function handleBatchSceneFrame(
   const shotWhereConditions = [eq(shots.projectId, projectId)];
   if (batchVersionId) shotWhereConditions.push(eq(shots.versionId, batchVersionId));
   if (episodeId) shotWhereConditions.push(eq(shots.episodeId, episodeId));
-  const allShots = await db
-    .select()
-    .from(shots)
-    .where(and(...shotWhereConditions))
-    .orderBy(asc(shots.sequence));
+  const allShots = await db.select().from(shots).where(and(...shotWhereConditions)).orderBy(asc(shots.sequence));
 
   const versionedUploadDir = batchVersionId
     ? await getVersionedUploadDir(batchVersionId)
     : process.env.UPLOAD_DIR || "./uploads";
 
-  const eligible = allShots.filter(
-    (s) => s.status !== "generating" && (overwrite || !s.sceneRefFrame)
-  );
-  if (eligible.length === 0) {
-    return NextResponse.json({ results: [], message: "No eligible shots" });
-  }
-
   const projectCharacters = await getEpisodeCharacters(projectId, episodeId);
-
   const charRefs = projectCharacters
     .filter((c) => !!c.referenceImage)
-    .map((c) => ({ name: c.name, imagePath: c.referenceImage as string }));
+    .map((c) => c.referenceImage as string);
 
   if (charRefs.length === 0) {
-    return NextResponse.json(
-      { error: "No character reference images available." },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "No character reference images available." }, { status: 400 });
   }
 
-  const charRefMapping = charRefs.map((c, i) => `${c.name}=图片${i + 1}`).join("，");
-  const characterDescriptions = projectCharacters
-    .map((c) => `${c.name}: ${c.description}`)
-    .join("\n");
-
   const imageProvider = resolveImageProvider(modelConfig, versionedUploadDir);
-  const sceneSlotContents = await resolveSlotContents("scene_frame_generate", { userId, projectId });
 
-  await Promise.all(
-    eligible.map((shot) =>
-      db.update(shots).set({ status: "generating" }).where(eq(shots.id, shot.id))
-    )
-  );
+  const results: Array<{ shotId: string; sequence: number; status: "ok" | "error"; generated: number; error?: string }> = [];
 
-  const results: Array<{
-    shotId: string;
-    sequence: number;
-    status: "ok" | "error";
-    sceneRefFrame?: string;
-    error?: string;
-  }> = [];
+  for (const shot of allShots) {
+    const refImages = parseRefImages(shot.referenceImages as string);
+    const targets = overwrite
+      ? refImages.filter((r) => r.prompt.trim())
+      : refImages.filter((r) => r.status === "pending" && r.prompt.trim());
 
-  for (const shot of eligible) {
-    try {
-      const sceneFramePrompt = buildSceneFramePrompt({
-        sceneDescription: shot.prompt || "",
-        charRefMapping,
-        characterDescriptions,
-        cameraDirection: shot.cameraDirection,
-        startFrameDesc: shot.startFrameDesc,
-        slotContents: sceneSlotContents,
-        motionScript: shot.motionScript,
-      });
-
-      console.log(`[BatchSceneFrame] Shot ${shot.sequence}: generating scene frame, mapping="${charRefMapping}"`);
-
-      const sceneFramePath = await imageProvider.generateImage(sceneFramePrompt, {
-        quality: "hd",
-        ...imageOpts,
-        referenceImages: charRefs.map((c) => c.imagePath),
-      });
-
-      // Auto-generate reference images
-      const refImagesRaw: string[] = shot.referenceImages ? JSON.parse(shot.referenceImages as string) : [];
-      const promptEntries = refImagesRaw.filter((r) => r.startsWith("prompt:"));
-      const existingImages = refImagesRaw.filter((r) => !r.startsWith("prompt:"));
-
-      // Build reference image prompts: use AI-provided if available, otherwise auto-generate from scene
-      let refPrompts: string[] = promptEntries.map((e) => e.replace(/^prompt:/, ""));
-
-      if (refPrompts.length === 0 && existingImages.length === 0) {
-        // Auto-generate prompts based on characters in this shot and scene description
-        const shotChars = projectCharacters.filter(
-          (c) => shot.prompt?.includes(c.name) || shot.startFrameDesc?.includes(c.name)
-        );
-
-        // Generate character close-up references for each character in the shot
-        for (const char of shotChars.slice(0, 3)) {
-          refPrompts.push(
-            `${char.description?.substring(0, 200) || char.name}, portrait close-up, looking at camera, neutral background, high detail`
-          );
-        }
-
-        // If no characters detected but has scene description, generate an environment reference
-        if (refPrompts.length === 0 && shot.prompt) {
-          refPrompts.push(
-            `${shot.prompt.substring(0, 200)}, establishing shot, wide angle, high detail`
-          );
-        }
-      }
-
-      const generatedRefs = [...existingImages];
-      for (const refPrompt of refPrompts) {
-        try {
-          const refPath = await imageProvider.generateImage(refPrompt, {
-            quality: "hd",
-            ...imageOpts,
-            referenceImages: charRefs.map((c) => c.imagePath),
-          });
-          generatedRefs.push(refPath);
-          console.log(`[BatchSceneFrame] Shot ${shot.sequence}: generated ref image`);
-        } catch (refErr) {
-          console.warn(`[BatchSceneFrame] Shot ${shot.sequence}: ref image failed, skipping:`, refErr);
-        }
-      }
-
-      await db
-        .update(shots)
-        .set({
-          sceneRefFrame: sceneFramePath,
-          ...(generatedRefs.length > 0 ? { referenceImages: JSON.stringify(generatedRefs) } : {}),
-          status: "pending",
-        })
-        .where(eq(shots.id, shot.id));
-
-      results.push({ shotId: shot.id, sequence: shot.sequence, status: "ok", sceneRefFrame: sceneFramePath });
-    } catch (err) {
-      console.error(`[BatchSceneFrame] Error for shot ${shot.sequence}:`, err);
-      await db.update(shots).set({ status: "failed" }).where(eq(shots.id, shot.id));
-      results.push({ shotId: shot.id, sequence: shot.sequence, status: "error", error: extractErrorMessage(err) });
+    if (targets.length === 0) {
+      results.push({ shotId: shot.id, sequence: shot.sequence, status: "ok", generated: 0 });
+      continue;
     }
+
+    await db.update(shots).set({ status: "generating" }).where(eq(shots.id, shot.id));
+    let generated = 0;
+
+    for (const entry of targets) {
+      try {
+        const imagePath = await imageProvider.generateImage(entry.prompt, {
+          quality: "hd",
+          ...imageOpts,
+          referenceImages: charRefs,
+        });
+        entry.imagePath = imagePath;
+        entry.status = "generated";
+        generated++;
+        console.log(`[BatchRefImage] Shot ${shot.sequence}: generated ref "${entry.id}"`);
+      } catch (err) {
+        console.warn(`[BatchRefImage] Shot ${shot.sequence} ref ${entry.id} failed:`, err);
+      }
+    }
+
+    // Set sceneRefFrame to first generated image (for video gen compatibility)
+    const firstGenerated = refImages.find((r) => r.status === "generated" && r.imagePath);
+
+    await db
+      .update(shots)
+      .set({
+        referenceImages: serializeRefImages(refImages),
+        ...(firstGenerated?.imagePath ? { sceneRefFrame: firstGenerated.imagePath } : {}),
+        status: "pending",
+      })
+      .where(eq(shots.id, shot.id));
+
+    results.push({ shotId: shot.id, sequence: shot.sequence, status: "ok", generated });
   }
 
   return NextResponse.json({ results });

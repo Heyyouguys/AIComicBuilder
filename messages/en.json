@@ -14,6 +14,7 @@
     "language": "Language",
     "switchLanguage": "Switch Language",
     "generationFailed": "Generation failed. Please check your model configuration and try again.",
+    "generationCompleted": "Generation completed",
     "batchPartialFailed": "Some items failed to generate. Please try again.",
     "promptTemplates": "Prompt Templates"
   },
@@ -150,6 +151,9 @@
     "referenceImages": "Reference Images",
     "addRefImage": "Add Reference",
     "refImagePrompt": "Reference image prompt...",
+    "noRefImages": "No reference image prompts yet",
+    "generateRefImages": "Generate Ref Images",
+    "regenerateRefImages": "Regenerate Ref Images",
     "maxRefImages": "Max 9 reference images",
     "transition": "Transition"
   },

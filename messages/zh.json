@@ -14,6 +14,7 @@
     "language": "语言",
     "switchLanguage": "切换语言",
     "generationFailed": "生成失败，请检查模型配置后重试",
+    "generationCompleted": "生成完成",
     "batchPartialFailed": "部分项目生成失败，请稍后重试",
     "promptTemplates": "提示词管理"
   },
@@ -151,6 +152,9 @@
     "referenceImages": "参考图",
     "addRefImage": "添加参考图",
     "refImagePrompt": "参考图提示词...",
+    "noRefImages": "暂无参考图提示词",
+    "generateRefImages": "生成参考图",
+    "regenerateRefImages": "重新生成参考图",
     "maxRefImages": "最多9张参考图",
     "transition": "转场"
   },

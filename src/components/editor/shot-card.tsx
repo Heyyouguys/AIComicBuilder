@@ -233,6 +233,7 @@ export function ShotCard({
   const hasFramePair = !!(firstFrame && lastFrame);
   const hasVideoPrompt = !!videoPrompt;
   const hasVideo = !!videoUrl;
+  const hasRefImages = parsedRefImages.some((r) => r.status === "generated" && r.imagePath);
   const isGenerating = status === "generating";
 
   // Step states
@@ -411,6 +412,28 @@ export function ShotCard({
     } catch {
       toast.error(t("common.generationFailed"));
     }
+  }
+
+  async function handleBatchGenerateRefImagesForShot() {
+    if (!imageGuard()) return;
+    setGeneratingSceneFrame(true);
+    try {
+      const resp = await apiFetch(`/api/projects/${projectId}/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "single_ref_image_generate_all",
+          payload: { shotId: id, ratio: videoRatio },
+          modelConfig: getModelConfig(),
+        }),
+      });
+      if (!resp.ok) throw new Error("Failed");
+      onUpdate();
+      toast.success(t("common.generationCompleted"));
+    } catch (err) {
+      toast.error(t("common.generationFailed"));
+    }
+    setGeneratingSceneFrame(false);
   }
 
   function handleUploadFrame(field: "firstFrame" | "lastFrame" | "sceneRefFrame") {
@@ -791,112 +814,75 @@ export function ShotCard({
         >
           {/* Frame thumbnails */}
           {generationMode === "reference" ? (
-            <div className="mb-2.5 space-y-3">
-              {/* Reference image cards */}
-              <div className="flex gap-2 flex-wrap">
-                {parsedRefImages.map((ref) => (
-                  <div key={ref.id} className="rounded-lg border border-[--border-subtle] bg-white overflow-hidden" style={{ width: "calc(50% - 4px)" }}>
-                    {/* Image area */}
-                    <div className="relative">
-                      {ref.imagePath ? (
-                        <div
-                          className="cursor-pointer hover:opacity-80 transition-opacity"
-                          onClick={() => setPreviewSrc(uploadUrl(ref.imagePath!))}
+            <div className="mb-2.5 space-y-2">
+              {parsedRefImages.length > 0 ? (
+                <div className="grid grid-cols-2 gap-2">
+                  {parsedRefImages.map((ref) => (
+                    <div key={ref.id} className="rounded-lg border border-[--border-subtle] bg-white overflow-hidden">
+                      {/* Image or placeholder */}
+                      <div className="relative aspect-video bg-[--surface]">
+                        {ref.imagePath ? (
+                          <img
+                            src={uploadUrl(ref.imagePath)}
+                            className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => setPreviewSrc(uploadUrl(ref.imagePath!))}
+                          />
+                        ) : (
+                          <div className="flex h-full items-center justify-center">
+                            {ref.prompt ? (
+                              <span className="text-[10px] text-[--text-muted] px-2 text-center line-clamp-3">{ref.prompt.substring(0, 80)}...</span>
+                            ) : (
+                              <ImageIcon className="h-5 w-5 text-[--text-muted]" />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      {/* Editable prompt */}
+                      <textarea
+                        key={`prompt-${ref.id}`}
+                        defaultValue={ref.prompt}
+                        onBlur={(e) => handleUpdateRefPrompt(ref.id, e.target.value)}
+                        placeholder={t("shot.refImagePrompt")}
+                        rows={2}
+                        className="w-full resize-none border-0 border-t border-[--border-subtle] bg-transparent px-2 py-1.5 text-[11px] leading-snug text-[--text-secondary] placeholder:text-[--text-muted] focus:outline-none"
+                      />
+                      {/* Action bar */}
+                      <div className="flex items-center gap-1 border-t border-[--border-subtle] px-1.5 py-1">
+                        <InlineModelPicker capability="image" />
+                        <div className="flex-1" />
+                        <button
+                          onClick={() => handleRegenerateRefImage(ref.id)}
+                          disabled={!ref.prompt?.trim()}
+                          className="flex items-center rounded px-1.5 py-0.5 text-[10px] text-[--text-muted] hover:bg-[--bg-muted] hover:text-primary disabled:opacity-30 transition-colors"
                         >
-                          <img src={uploadUrl(ref.imagePath)} className="w-full object-contain" />
-                        </div>
-                      ) : (
-                        <div className="flex h-20 items-center justify-center bg-[--surface]">
-                          {ref.prompt ? (
-                            <button
-                              onClick={() => handleRegenerateRefImage(ref.id)}
-                              className="flex items-center gap-1 text-xs text-primary hover:text-primary/80"
-                            >
-                              <Sparkles className="h-3 w-3" />
-                              {t("common.generate") || "Generate"}
-                            </button>
-                          ) : (
-                            <ImageIcon className="h-4 w-4 text-[--text-muted]" />
-                          )}
-                        </div>
-                      )}
+                          <RefreshCw className="h-2.5 w-2.5" />
+                        </button>
+                        <button
+                          onClick={() => handleRemoveRefImage(ref.id)}
+                          className="flex items-center rounded px-1.5 py-0.5 text-[10px] text-[--text-muted] hover:bg-red-50 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="h-2.5 w-2.5" />
+                        </button>
+                      </div>
                     </div>
-                    {/* Prompt textarea */}
-                    <textarea
-                      key={ref.id}
-                      defaultValue={ref.prompt}
-                      onBlur={(e) => handleUpdateRefPrompt(ref.id, e.target.value)}
-                      placeholder={t("shot.refImagePrompt")}
-                      rows={2}
-                      className="w-full resize-none border-0 border-t border-[--border-subtle] bg-transparent px-2 py-1.5 text-[11px] leading-snug text-[--text-secondary] placeholder:text-[--text-muted] focus:outline-none"
-                    />
-                    {/* Action bar: model selector + regenerate + delete */}
-                    <div className="flex items-center gap-1 border-t border-[--border-subtle] px-1.5 py-1">
-                      <InlineModelPicker capability="image" />
-                      <div className="flex-1" />
-                      <button
-                        onClick={() => handleRegenerateRefImage(ref.id)}
-                        disabled={!ref.prompt.trim()}
-                        className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] text-[--text-muted] hover:bg-[--bg-muted] hover:text-primary disabled:opacity-30 transition-colors"
-                      >
-                        <RefreshCw className="h-2.5 w-2.5" />
-                      </button>
-                      <button
-                        onClick={() => handleRemoveRefImage(ref.id)}
-                        className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] text-[--text-muted] hover:bg-red-50 hover:text-red-500 transition-colors"
-                      >
-                        <Trash2 className="h-2.5 w-2.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center rounded-lg border border-dashed border-[--border-subtle] p-4 text-xs text-[--text-muted]">
+                  {t("shot.noRefImages") || "No reference image prompts yet"}
+                </div>
+              )}
 
-                {/* Add button */}
-                {parsedRefImages.length < 9 && (
-                  <div className="flex flex-col gap-1" style={{ width: "calc(50% - 4px)" }}>
-                    <button
-                      onClick={handleAddRefImage}
-                      className="flex h-20 items-center justify-center rounded-lg border border-dashed border-[--border-subtle] bg-[--surface] text-[--text-muted] hover:border-primary/40 hover:text-primary transition-colors"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                    </button>
-                    <span className="text-center text-[10px] text-[--text-muted]">{t("shot.addRefImage")}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Scene ref frame (below ref images) */}
-              <div className="flex items-center gap-2 pt-1 border-t border-[--border-subtle]">
-                <div
-                  className={`overflow-hidden rounded-lg border border-[--border-subtle] bg-[--surface] w-20 shrink-0 ${sceneRefFrame ? "cursor-pointer hover:opacity-80" : ""}`}
-                  onClick={() => sceneRefFrame && setPreviewSrc(uploadUrl(sceneRefFrame))}
+              {/* Add ref image button */}
+              {parsedRefImages.length < 9 && (
+                <button
+                  onClick={handleAddRefImage}
+                  className="flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-[--border-subtle] py-2 text-xs text-[--text-muted] hover:border-primary/40 hover:text-primary transition-colors"
                 >
-                  {sceneRefFrame ? (
-                    <img src={uploadUrl(sceneRefFrame)} className="w-full object-contain" />
-                  ) : (
-                    <div className="flex h-12 items-center justify-center"><ImageIcon className="h-3.5 w-3.5 text-[--text-muted]" /></div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="text-[10px] text-[--text-muted]">{t("shot.sceneRefFrame")}</span>
-                </div>
-                <div className="flex gap-1 shrink-0">
-                  <button
-                    onClick={() => handleUploadFrame("sceneRefFrame")}
-                    className="flex items-center gap-1 rounded-md border border-[--border-subtle] bg-white px-1.5 py-0.5 text-[10px] text-[--text-muted] hover:border-primary/40 hover:text-primary"
-                  >
-                    <Upload className="h-2.5 w-2.5" />
-                  </button>
-                  {sceneRefFrame && (
-                    <button
-                      onClick={() => handleClearFrame("sceneRefFrame")}
-                      className="flex items-center rounded-md border border-[--border-subtle] bg-white px-1.5 py-0.5 text-[10px] text-[--text-muted] hover:border-red-300 hover:text-red-500"
-                    >
-                      <Trash2 className="h-2.5 w-2.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
+                  <Plus className="h-3 w-3" />
+                  {t("shot.addRefImage")}
+                </button>
+              )}
             </div>
           ) : (
             <div className="mb-2.5 flex gap-2">
@@ -943,7 +929,7 @@ export function ShotCard({
           <Button
             size="xs"
             variant={nextStep === "frame" ? "default" : "outline"}
-            onClick={generationMode === "reference" ? handleGenerateSceneFrame : handleGenerateFrames}
+            onClick={generationMode === "reference" ? handleBatchGenerateRefImagesForShot : handleGenerateFrames}
             disabled={generatingFrames || generatingSceneFrame || generatingVideo || batchGeneratingFrames}
           >
             {(generatingFrames || generatingSceneFrame || batchGeneratingFrames)
@@ -952,7 +938,9 @@ export function ShotCard({
             }
             {(generatingFrames || generatingSceneFrame || batchGeneratingFrames)
               ? t("common.generating")
-              : hasFrame ? t("shot.regenerateFrames") : t("project.generateFrames")
+              : generationMode === "reference"
+                ? (hasRefImages ? (t("shot.regenerateRefImages") || "Regenerate Ref Images") : (t("shot.generateRefImages") || "Generate Ref Images"))
+                : hasFrame ? t("shot.regenerateFrames") : t("project.generateFrames")
             }
           </Button>
         </StepRow>
