@@ -810,10 +810,21 @@ async function handleShotSplitStream(
           providerOptions: jsonMode,
         });
         const parsed = JSON.parse(extractJSON(result.text));
-        // Handle both array and {shots:[]} formats
-        const shots = Array.isArray(parsed) ? parsed : (parsed.shots || []);
-        console.log(`[ShotSplit] Chunk ${idx + 1}/${sceneChunks.length}: ${shots.length} shots`);
-        return shots as ParsedShot[];
+        // Handle multiple formats:
+        // 1. Scene-grouped: [{ sceneTitle, shots: [...] }]
+        // 2. Flat with wrapper: { shots: [...] }
+        // 3. Flat array: [{ sequence, ... }]
+        let shotList: ParsedShot[];
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].shots) {
+          // Scene-grouped format — flatten all shots from all scenes
+          shotList = parsed.flatMap((scene: { shots?: ParsedShot[] }) => scene.shots || []);
+        } else if (Array.isArray(parsed)) {
+          shotList = parsed;
+        } else {
+          shotList = parsed.shots || [];
+        }
+        console.log(`[ShotSplit] Chunk ${idx + 1}/${sceneChunks.length}: ${shotList.length} shots, keys: ${shotList[0] ? Object.keys(shotList[0]).join(",") : "empty"}`);
+        return shotList as ParsedShot[];
       } catch (err) {
         console.error(`[ShotSplit] Chunk ${idx + 1} failed:`, err);
         return [] as ParsedShot[];
@@ -876,30 +887,14 @@ async function handleShotSplitStream(
       depthOfField: shot.depthOfField || "medium",
       soundDesign: shot.soundDesign || "",
       musicCue: shot.musicCue || "",
-      referenceImages: (() => {
-        let refPrompts = Array.isArray(shot.referenceImagePrompts) ? shot.referenceImagePrompts : [];
-
-        // Fallback: if AI didn't output referenceImagePrompts, auto-generate from shot content
-        if (refPrompts.length === 0) {
-          const desc = shot.sceneDescription || shot.startFrame || "";
-          if (desc) {
-            // Generate 1-2 reference prompts from scene description
-            refPrompts = [desc.substring(0, 200)];
-            if (shot.endFrame && shot.endFrame !== shot.startFrame) {
-              refPrompts.push(shot.endFrame.substring(0, 200));
-            }
-          }
-        }
-
-        console.log(`[ShotSplit] Shot ${shot.sequence}: ${refPrompts.length} ref image prompts`);
-        return JSON.stringify(
-          refPrompts.map((p: string) => ({
+      referenceImages: JSON.stringify(
+        (Array.isArray(shot.referenceImagePrompts) ? shot.referenceImagePrompts : [])
+          .map((p: string) => ({
             id: genId(),
             prompt: p,
             status: "pending",
           }))
-        );
-      })(),
+      ),
       episodeId: episodeId ?? null,
     });
 
