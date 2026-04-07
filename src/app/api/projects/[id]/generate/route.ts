@@ -71,6 +71,28 @@ function isCharacterOnScreen(
 }
 
 
+/**
+ * Build character mapping prompt prefix for image generation.
+ * Includes character name, height, body type, description, and strict
+ * proportion enforcement when multiple characters are present.
+ */
+function buildCharMappingPrefix(chars: Array<typeof characters.$inferSelect>): string {
+  if (chars.length === 0) return "";
+  const charMapping = chars.map((c, i) => `图片${i + 1}=${c.name}`).join("，");
+  const charDescriptions = chars
+    .map((c) => {
+      const heightInfo = c.heightCm ? `身高约${c.heightCm}cm` : "";
+      const bodyInfo = c.bodyType ? `${c.bodyType}体型` : "";
+      const physicalTags = [heightInfo, bodyInfo].filter(Boolean).join("，");
+      return `${c.name}${physicalTags ? `（${physicalTags}）` : ""}: ${c.description || ""}`;
+    })
+    .join("\n");
+  const heightHint = chars.length > 1
+    ? `\n\n【角色比例严格要求】画面中角色的相对身高/体型必须严格遵循上述身高数据。儿童必须明显小于成人，体型矮小、头身比例符合实际年龄，绝不可画成与成人同等大小。`
+    : "";
+  return `角色映射：${charMapping}\n\n角色描述：\n${charDescriptions}${heightHint}\n\n严格按照参考图的角色外观（面部、服装、发型）和相对比例生成。\n\n场景描述：`;
+}
+
 async function getVersionedUploadDir(versionId: string | null | undefined): Promise<string> {
   if (!versionId) return process.env.UPLOAD_DIR || "./uploads";
   const [version] = await db
@@ -1857,14 +1879,8 @@ async function handleBatchSceneFrame(
         : charsWithRefs.slice(0, 3);
       const shotCharRefs = relevantChars.map((c) => c.referenceImage as string);
 
-      // Build character mapping prompt prefix (Toonflow-style)
-      const charMapping = relevantChars.map((c, i) => `图片${i + 1}=${c.name}`).join("，");
-      const charDescriptions = relevantChars
-        .map((c) => `${c.name}: ${c.description || ""}`)
-        .join("\n");
-      const promptPrefix = relevantChars.length > 0
-        ? `角色映射：${charMapping}\n\n角色描述：\n${charDescriptions}\n\n严格按照参考图的角色外观（面部、服装、发型）生成。\n\n场景描述：`
-        : "";
+      // Build character mapping prompt prefix
+      const promptPrefix = buildCharMappingPrefix(relevantChars);
 
       console.log(`[BatchSceneFrame] Shot ${shot.sequence}: ${targets.length} refs, ${relevantChars.length} chars: ${relevantChars.map(c => c.name).join(", ")}`);
 
@@ -2714,13 +2730,8 @@ async function handleBatchRefImageGenerate(
         const entryCharRefs = entryRelevantChars.map((c) => c.referenceImage as string);
 
         // Build prompt with explicit character mapping
-        const charMapping = entryRelevantChars.map((c, i) => `图片${i + 1}=${c.name}`).join("，");
-        const charDescriptions = entryRelevantChars
-          .map((c) => `${c.name}: ${c.description || ""}`)
-          .join("\n");
-        const fullPrompt = entryRelevantChars.length > 0
-          ? `角色映射：${charMapping}\n\n角色描述：\n${charDescriptions}\n\n严格按照参考图的角色外观（面部、服装、发型）生成。\n\n场景描述：${entry.prompt}`
-          : entry.prompt;
+        const promptPrefix = buildCharMappingPrefix(entryRelevantChars);
+        const fullPrompt = promptPrefix ? promptPrefix + entry.prompt : entry.prompt;
 
         const imagePath = await imageProvider.generateImage(fullPrompt, {
           quality: "hd",
@@ -2790,15 +2801,9 @@ async function handleSingleRefImageGenerate(
     : charsWithRefs.slice(0, 3);
   const charRefs = relevantChars.map((c) => c.referenceImage as string);
 
-  // Build prompt with explicit character mapping (Toonflow-style)
-  const charMapping = relevantChars.map((c, i) => `图片${i + 1}=${c.name}`).join("，");
-  const charDescriptions = relevantChars
-    .map((c) => `${c.name}: ${c.description || ""}`)
-    .join("\n");
-
-  const fullPrompt = relevantChars.length > 0
-    ? `角色映射：${charMapping}\n\n角色描述：\n${charDescriptions}\n\n严格按照参考图的角色外观（面部、服装、发型）生成。\n\n场景描述：${entry.prompt}`
-    : entry.prompt;
+  // Build prompt with explicit character mapping (includes height/proportion enforcement)
+  const promptPrefix = buildCharMappingPrefix(relevantChars);
+  const fullPrompt = promptPrefix ? promptPrefix + entry.prompt : entry.prompt;
 
   console.log(`[SingleRefImage] Shot ${shot.sequence}: using ${relevantChars.length} chars (${relevantChars.map(c => c.name).join(", ")}) for ref "${refImageId}"`);
 
@@ -2967,13 +2972,7 @@ async function handleSingleShotRefImageGenerateAll(
   const charRefsForShot = relevantChars.map((c) => c.referenceImage as string);
 
   // Build character mapping prompt prefix
-  const charMapping = relevantChars.map((c, i) => `图片${i + 1}=${c.name}`).join("，");
-  const charDescriptions = relevantChars
-    .map((c) => `${c.name}: ${c.description || ""}`)
-    .join("\n");
-  const promptPrefix = relevantChars.length > 0
-    ? `角色映射：${charMapping}\n\n角色描述：\n${charDescriptions}\n\n严格按照参考图的角色外观（面部、服装、发型）生成。\n\n场景描述：`
-    : "";
+  const promptPrefix = buildCharMappingPrefix(relevantChars);
 
   console.log(`[RefImageGenAll] Shot ${shot.sequence}: using ${relevantChars.length} chars: ${relevantChars.map(c => c.name).join(", ")}`);
 
