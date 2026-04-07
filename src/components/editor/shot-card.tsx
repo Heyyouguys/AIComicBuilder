@@ -412,15 +412,15 @@ export function ShotCard({
     saveRefImages(updated);
   }
 
+  // Per-ref-image loading state
+  const [regeneratingRefIds, setRegeneratingRefIds] = useState<Set<string>>(new Set());
+
   // Regenerate a single ref image
   async function handleRegenerateRefImage(refId: string) {
     if (!imageGuard()) return;
 
-    // Set to pending first
-    const updated = parsedRefImages.map((r) =>
-      r.id === refId ? { ...r, imagePath: undefined, status: "pending" as const } : r
-    );
-    await saveRefImages(updated);
+    // Mark as loading
+    setRegeneratingRefIds((prev) => new Set(prev).add(refId));
 
     try {
       const modelConfig = getModelConfig();
@@ -437,6 +437,12 @@ export function ShotCard({
       onUpdate();
     } catch {
       toast.error(t("common.generationFailed"));
+    } finally {
+      setRegeneratingRefIds((prev) => {
+        const next = new Set(prev);
+        next.delete(refId);
+        return next;
+      });
     }
   }
 
@@ -801,6 +807,12 @@ export function ShotCard({
                             )}
                           </div>
                         )}
+                        {/* Loading overlay during regeneration */}
+                        {regeneratingRefIds.has(ref.id) && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+                            <Loader2 className="h-5 w-5 animate-spin text-white" />
+                          </div>
+                        )}
                       </div>
                       {/* Editable prompt with auto-save */}
                       <div className="border-t border-[--border-subtle]">
@@ -860,10 +872,14 @@ export function ShotCard({
                         <div className="flex-1" />
                         <button
                           onClick={() => handleRegenerateRefImage(ref.id)}
-                          disabled={!ref.prompt?.trim()}
+                          disabled={!ref.prompt?.trim() || regeneratingRefIds.has(ref.id)}
                           className="flex items-center rounded px-1.5 py-0.5 text-[10px] text-[--text-muted] hover:bg-[--bg-muted] hover:text-primary disabled:opacity-30 transition-colors"
                         >
-                          <RefreshCw className="h-2.5 w-2.5" />
+                          {regeneratingRefIds.has(ref.id) ? (
+                            <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-2.5 w-2.5" />
+                          )}
                         </button>
                         <button
                           onClick={() => handleRemoveRefImage(ref.id)}
