@@ -20,6 +20,8 @@ interface AiOptimizeButtonProps {
   fieldLabel?: string;
   /** Project ID for API context */
   projectId: string;
+  /** Optional reference images to send to vision AI for visual analysis */
+  images?: string[];
 }
 
 const DEFAULT_INSTRUCTIONS: Record<string, string> = {
@@ -65,6 +67,7 @@ export function AiOptimizeButton({
   onOptimized,
   fieldLabel,
   projectId,
+  images,
 }: AiOptimizeButtonProps) {
   const t = useTranslations();
   const [open, setOpen] = useState(false);
@@ -98,6 +101,7 @@ export function AiOptimizeButton({
           payload: {
             originalText: value,
             instruction,
+            images: images && images.length > 0 ? images : undefined,
           },
           modelConfig: getModelConfig(),
         }),

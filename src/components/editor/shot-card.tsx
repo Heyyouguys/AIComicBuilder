@@ -848,6 +848,7 @@ export function ShotCard({
                             }}
                             fieldLabel="refImagePrompt"
                             projectId={projectId}
+                            images={ref.imagePath ? [ref.imagePath] : undefined}
                           />
                         </div>
                         <textarea
@@ -975,6 +976,7 @@ export function ShotCard({
                           onOptimized={(v) => { setEditValue(v); patchShot({ [dbField]: v }); }}
                           fieldLabel={dbField}
                           projectId={projectId}
+                          images={asset.src ? [asset.src] : undefined}
                         />
                       </div>
                       <textarea
