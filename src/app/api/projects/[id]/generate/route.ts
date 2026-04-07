@@ -1598,9 +1598,19 @@ async function handleSingleVideoGenerate(
       ratio,
     });
 
+    // Track video history
+    const { trackMediaHistory } = await import("@/lib/ref-image-utils");
+    const [latestForVideo] = await db.select().from(shots).where(eq(shots.id, shotId));
+    const refsForVideo = parseRefImages(latestForVideo?.referenceImages as string);
+    const updatedRefsForVideo = trackMediaHistory(refsForVideo, "video", result.filePath);
+
     await db
       .update(shots)
-      .set({ videoUrl: result.filePath, status: "completed" })
+      .set({
+        videoUrl: result.filePath,
+        referenceImages: serializeRefImages(updatedRefsForVideo),
+        status: "completed",
+      })
       .where(eq(shots.id, shotId));
 
     return NextResponse.json({ shotId, videoUrl: result.filePath, status: "ok" });
@@ -1711,9 +1721,18 @@ async function handleBatchVideoGenerate(
           ratio,
         });
 
+        // Track video history
+        const { trackMediaHistory: trackHistBatch } = await import("@/lib/ref-image-utils");
+        const refsForBatchVideo = parseRefImages(shot.referenceImages as string);
+        const updatedBatchVideo = trackHistBatch(refsForBatchVideo, "video", result.filePath);
+
         await db
           .update(shots)
-          .set({ videoUrl: result.filePath, status: "completed" })
+          .set({
+            videoUrl: result.filePath,
+            referenceImages: serializeRefImages(updatedBatchVideo),
+            status: "completed",
+          })
           .where(eq(shots.id, shot.id));
 
         console.log(`[BatchVideoGenerate] Shot ${shot.sequence} completed`);
@@ -2091,11 +2110,18 @@ async function handleSingleReferenceVideo(
       referenceImages: allRefImages,
     });
 
+    // Track ref video history
+    const { trackMediaHistory: trackHistRefVid } = await import("@/lib/ref-image-utils");
+    const [latestForRefVid] = await db.select().from(shots).where(eq(shots.id, shotId));
+    const refsForRefVid = parseRefImages(latestForRefVid?.referenceImages as string);
+    const updatedRefsForRefVid = trackHistRefVid(refsForRefVid, "ref_video", result.filePath);
+
     await db
       .update(shots)
       .set({
         referenceVideoUrl: result.filePath,
         lastFrameUrl: result.lastFrameUrl ?? null,
+        referenceImages: serializeRefImages(updatedRefsForRefVid),
         status: "completed",
       })
       .where(eq(shots.id, shotId));
@@ -2284,11 +2310,17 @@ async function handleBatchReferenceVideo(
           referenceImages: allRefImages,
         });
 
+        // Track ref video history
+        const { trackMediaHistory: trackHistBatchRefVid } = await import("@/lib/ref-image-utils");
+        const refsForBatchRefVid = parseRefImages(shot.referenceImages as string);
+        const updatedBatchRefVid = trackHistBatchRefVid(refsForBatchRefVid, "ref_video", result.filePath);
+
         await db
           .update(shots)
           .set({
             referenceVideoUrl: result.filePath,
             lastFrameUrl: result.lastFrameUrl ?? null,
+            referenceImages: serializeRefImages(updatedBatchRefVid),
             status: "completed",
           })
           .where(eq(shots.id, shot.id));

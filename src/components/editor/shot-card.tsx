@@ -1186,20 +1186,58 @@ export function ShotCard({
           state={videoState}
           isNext={nextStep === "video"}
         >
-          {hasVideo && (
-            <div
-              className="group relative mb-2.5 w-full overflow-hidden rounded-xl border border-[--border-subtle] bg-black cursor-pointer"
-              style={{ aspectRatio: "16/9" }}
-              onClick={() => setPreviewSrc(uploadUrl(videoUrl!))}
-            >
-              <video className="h-full w-full object-contain" src={uploadUrl(videoUrl!)} />
-              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-lg">
-                  <VideoIcon className="h-4 w-4 text-[--text-primary] translate-x-0.5" />
+          {hasVideo && (() => {
+            const videoTypeKey = generationMode === "reference" ? "ref_video" : "video";
+            const videoItem = allRefItems.find((r) => r.type === videoTypeKey);
+            const videoHistory = videoItem?.history || (videoUrl ? [videoUrl] : []);
+            const videoCurrentIdx = videoUrl ? videoHistory.indexOf(videoUrl) : -1;
+            return (
+              <div
+                className="group relative mb-2.5 w-full overflow-hidden rounded-xl border border-[--border-subtle] bg-black cursor-pointer"
+                style={{ aspectRatio: "16/9" }}
+                onClick={() => setPreviewSrc(uploadUrl(videoUrl!))}
+              >
+                <video className="h-full w-full object-contain" src={uploadUrl(videoUrl!)} />
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-lg">
+                    <VideoIcon className="h-4 w-4 text-[--text-primary] translate-x-0.5" />
+                  </div>
                 </div>
+                {/* History navigation arrows */}
+                {videoHistory.length > 1 && (
+                  <>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const next = (videoCurrentIdx - 1 + videoHistory.length) % videoHistory.length;
+                        const fieldName = generationMode === "reference" ? "referenceVideoUrl" : "videoUrl";
+                        patchShot({ [fieldName]: videoHistory[next] });
+                        onUpdate();
+                      }}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const next = (videoCurrentIdx + 1) % videoHistory.length;
+                        const fieldName = generationMode === "reference" ? "referenceVideoUrl" : "videoUrl";
+                        patchShot({ [fieldName]: videoHistory[next] });
+                        onUpdate();
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                    <span className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded bg-black/60 px-2 py-0.5 text-[10px] text-white">
+                      {videoCurrentIdx + 1}/{videoHistory.length}
+                    </span>
+                  </>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
           <Button
             size="xs"
             variant={nextStep === "video" ? "default" : "outline"}

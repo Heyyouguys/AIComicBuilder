@@ -97,3 +97,30 @@ export function appendToHistory(item: RefImage, newPath: string): RefImage {
     history,
   };
 }
+
+/**
+ * Track a media path (video/scene_ref/etc) by upserting an item of given type
+ * into a refImages array. Returns the updated array.
+ */
+export function trackMediaHistory(
+  refImages: RefImage[],
+  type: RefImageType,
+  newPath: string
+): RefImage[] {
+  const idx = refImages.findIndex((r) => r.type === type);
+  if (idx >= 0) {
+    return refImages.map((r, i) => i === idx ? appendToHistory(r, newPath) : r);
+  }
+  // Create new tracking item
+  return [
+    ...refImages,
+    {
+      id: genId(),
+      type,
+      prompt: "",
+      imagePath: newPath,
+      status: "generated" as const,
+      history: [newPath],
+    },
+  ];
+}

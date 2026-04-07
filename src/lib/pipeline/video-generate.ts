@@ -73,9 +73,18 @@ export async function handleVideoGenerate(task: Task) {
     ratio: payload.ratio ?? "16:9",
   });
 
+  // Track video history in referenceImages
+  const { parseRefImages, serializeRefImages, trackMediaHistory } = await import("@/lib/ref-image-utils");
+  const refsForVideo = parseRefImages(shot.referenceImages as string);
+  const updatedForVideo = trackMediaHistory(refsForVideo, "video", result.filePath);
+
   await db
     .update(shots)
-    .set({ videoUrl: result.filePath, status: "completed" })
+    .set({
+      videoUrl: result.filePath,
+      referenceImages: serializeRefImages(updatedForVideo),
+      status: "completed",
+    })
     .where(eq(shots.id, payload.shotId));
 
   // Best-effort video quality check — does not block or fail generation
